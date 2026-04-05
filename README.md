@@ -1,5 +1,6 @@
 # OVapi MCP Server
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/henrrrik/ovapi-mcp-server)](https://goreportcard.com/report/github.com/henrrrik/ovapi-mcp-server)
 An MCP (Model Context Protocol) server that proxies the Dutch [OVapi](https://www.ovapi.nl/) public transport APIs, with fuzzy stop search powered by Postgres.
 
 
