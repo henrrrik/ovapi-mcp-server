@@ -15,8 +15,8 @@ type StopSearcher interface {
 }
 
 func SearchStopsTool(searcher StopSearcher) (mcp.Tool, server.ToolHandlerFunc) {
-	tool := mcp.NewTool("ovapi_search_stops",
-		mcp.WithDescription("Search for Dutch public transport stops by name. Returns matching stops with TPC codes, names, and coordinates. Use the TPC codes with ovapi_departures_by_stop to get departures."),
+	tool := mcp.NewTool("search_stops",
+		mcp.WithDescription("Search for Dutch public transport stops by name. Returns matching stops with TPC codes, names, and coordinates."),
 		mcp.WithString("query", mcp.Required(), mcp.Description("Search query for stop name (e.g. 'Amsterdam Centraal', 'Utrecht', 'Schiphol')")),
 		mcp.WithNumber("limit", mcp.Description("Maximum number of results to return (default 10, max 50)")),
 	)

@@ -43,102 +43,6 @@ func loadTestData(t *testing.T, name string) string {
 	return string(data)
 }
 
-func TestDeparturesByStopTool(t *testing.T) {
-	body := loadTestData(t, "tpc.json")
-	mock := newMockDoer(body)
-
-	_, handler := DeparturesByStopTool(mock)
-
-	req := mcp.CallToolRequest{}
-	req.Params.Arguments = map[string]any{
-		"tpc_codes": "ut010",
-	}
-
-	result, err := handler(context.Background(), req)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if result.IsError {
-		t.Fatal("expected non-error result")
-	}
-
-	if !strings.Contains(mock.lastReq.URL.String(), "/tpc/ut010") {
-		t.Errorf("unexpected URL: %s", mock.lastReq.URL.String())
-	}
-
-	text := result.Content[0].(mcp.TextContent).Text
-	if !strings.Contains(text, "Utrecht Centraal") {
-		t.Error("result should contain fixture data")
-	}
-}
-
-func TestDeparturesByStopTool_MissingParam(t *testing.T) {
-	mock := newMockDoer("{}")
-
-	_, handler := DeparturesByStopTool(mock)
-
-	req := mcp.CallToolRequest{}
-	req.Params.Arguments = map[string]any{}
-
-	result, err := handler(context.Background(), req)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if !result.IsError {
-		t.Error("expected error result when tpc_codes is missing")
-	}
-}
-
-func TestDeparturesByAreaTool(t *testing.T) {
-	body := loadTestData(t, "stopareacode.json")
-	mock := newMockDoer(body)
-
-	_, handler := DeparturesByAreaTool(mock)
-
-	req := mcp.CallToolRequest{}
-	req.Params.Arguments = map[string]any{
-		"stopareacode": "utcs",
-	}
-
-	result, err := handler(context.Background(), req)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if result.IsError {
-		t.Fatal("expected non-error result")
-	}
-
-	if !strings.Contains(mock.lastReq.URL.String(), "/stopareacode/utcs") {
-		t.Errorf("unexpected URL: %s", mock.lastReq.URL.String())
-	}
-
-	text := result.Content[0].(mcp.TextContent).Text
-	if !strings.Contains(text, "Utrecht Centraal") {
-		t.Error("result should contain fixture data")
-	}
-}
-
-func TestDeparturesByAreaTool_MissingParam(t *testing.T) {
-	mock := newMockDoer("{}")
-
-	_, handler := DeparturesByAreaTool(mock)
-
-	req := mcp.CallToolRequest{}
-	req.Params.Arguments = map[string]any{}
-
-	result, err := handler(context.Background(), req)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if !result.IsError {
-		t.Error("expected error result when stopareacode is missing")
-	}
-}
-
 func TestLinesTool_NoParams(t *testing.T) {
 	body := loadTestData(t, "lines.json")
 	mock := newMockDoer(body)
@@ -244,12 +148,10 @@ func TestJourneyTool_MissingParam(t *testing.T) {
 func TestFetchJSON_HTTPError(t *testing.T) {
 	mock := newMockDoerWithStatus("not found", 404)
 
-	_, handler := DeparturesByStopTool(mock)
+	_, handler := LinesTool(mock)
 
 	req := mcp.CallToolRequest{}
-	req.Params.Arguments = map[string]any{
-		"tpc_codes": "ut010",
-	}
+	req.Params.Arguments = map[string]any{}
 
 	result, err := handler(context.Background(), req)
 	if err != nil {
