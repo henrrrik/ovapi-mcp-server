@@ -7,11 +7,10 @@ An MCP (Model Context Protocol) server that proxies the Dutch [OVapi](https://ww
 
 | Tool | Description |
 |------|-------------|
-| `ovapi_search_stops` | Search for stops by name (e.g. "Amsterdam Centraal", "Schiphol"). Returns TPC codes, names, and coordinates. |
-| `ovapi_departures_by_stop` | Get real-time departures for stop(s) by timing point code. |
-| `ovapi_departures_by_area` | Get real-time departures for a stop area (collection of stops). |
-| `ovapi_lines` | List all public transport lines, or get details for a specific line. |
-| `ovapi_journey` | Get journey/vehicle information including location data. |
+| `get_departures` | Get real-time departures by stop name. Fuzzy-searches the database and fetches departures for matching stops. |
+| `search_stops` | Search for stops by name (e.g. "Amsterdam Centraal", "Schiphol"). Returns TPC codes, names, and coordinates. |
+| `lines` | List all public transport lines, or get details for a specific line. |
+| `journey` | Get journey/vehicle information including location data. |
 
 ## Usage with Claude Desktop
 
