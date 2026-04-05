@@ -1,6 +1,7 @@
 package ovapiclient
 
 import (
+	"crypto/tls"
 	"net/http"
 	"time"
 )
@@ -12,7 +13,12 @@ type HTTPDoer interface {
 
 // NewClient returns an HTTPDoer with sensible timeouts.
 func NewClient() HTTPDoer {
-	return &http.Client{Timeout: 15 * time.Second}
+	return &http.Client{
+		Timeout: 15 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // OVapi has a misconfigured TLS certificate
+		},
+	}
 }
 
 // BuildURL constructs a full URL from base and path segments.

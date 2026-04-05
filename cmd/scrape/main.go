@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -36,7 +37,12 @@ func main() {
 		log.Fatalf("database migration failed: %v", err)
 	}
 
-	client := &http.Client{Timeout: 30 * time.Second}
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // OVapi has a misconfigured TLS certificate
+		},
+	}
 
 	log.Println("fetching TPC code list...")
 	codes, err := fetchTPCList(ctx, client)
