@@ -1,6 +1,9 @@
 package main
 
 import (
+	"log"
+	"os"
+
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 
@@ -15,8 +18,10 @@ func NewOVapiServer(client ovapiclient.HTTPDoer, searcher tools.StopSearcher) *s
 		server.WithToolCapabilities(true),
 	)
 
+	logger := log.New(os.Stderr, "", log.LstdFlags)
+
 	add := func(tool mcp.Tool, handler server.ToolHandlerFunc) {
-		s.AddTool(tool, handler)
+		s.AddTool(tool, tools.WithLogging(logger, tool.Name, handler))
 	}
 
 	add(tools.LinesTool(client))
