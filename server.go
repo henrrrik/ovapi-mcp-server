@@ -19,12 +19,11 @@ func NewOVapiServer(client ovapiclient.HTTPDoer, searcher tools.StopSearcher) *s
 		s.AddTool(tool, handler)
 	}
 
-	add(tools.DeparturesByStopTool(client))
-	add(tools.DeparturesByAreaTool(client))
 	add(tools.LinesTool(client))
 	add(tools.JourneyTool(client))
 
 	if searcher != nil {
+		add(tools.DeparturesTool(client, searcher))
 		add(tools.SearchStopsTool(searcher))
 	}
 
