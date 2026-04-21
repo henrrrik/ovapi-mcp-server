@@ -48,6 +48,7 @@ type LeanStop struct {
 	Name       string          `json:"name"`
 	Town       string          `json:"town,omitempty"`
 	Coord      [2]float64      `json:"coord"`
+	PairedWith []string        `json:"paired_with,omitempty"`
 	Departures []LeanDeparture `json:"departures"`
 	Messages   []string        `json:"messages"`
 }

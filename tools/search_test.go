@@ -12,16 +12,27 @@ import (
 )
 
 type mockStopSearcher struct {
-	results []db.Stop
-	err     error
-	lastQ   string
-	lastLim int
+	results     []db.Stop
+	err         error
+	lastQ       string
+	lastLim     int
+	pairs       map[string][]string
+	pairsErr    error
+	lastPairReq []string
 }
 
 func (m *mockStopSearcher) SearchStops(_ context.Context, query string, limit int) ([]db.Stop, error) {
 	m.lastQ = query
 	m.lastLim = limit
 	return m.results, m.err
+}
+
+func (m *mockStopSearcher) PairedStopsByCode(_ context.Context, codes []string) (map[string][]string, error) {
+	m.lastPairReq = append([]string{}, codes...)
+	if m.pairs == nil {
+		return map[string][]string{}, m.pairsErr
+	}
+	return m.pairs, m.pairsErr
 }
 
 func TestSearchStopsTool(t *testing.T) {
@@ -123,5 +134,82 @@ func TestSearchStopsTool_SearchError(t *testing.T) {
 	text := result.Content[0].(mcp.TextContent).Text
 	if !strings.Contains(text, "db connection failed") {
 		t.Errorf("expected error message, got %q", text)
+	}
+}
+
+func TestSearchStopsTool_IncludesPairedWith(t *testing.T) {
+	mock := &mockStopSearcher{
+		results: []db.Stop{
+			{TPCCode: "30006018", Name: "Nicolaas Beetsstraat", Latitude: 52.365417, Longitude: 4.8653097},
+			{TPCCode: "30006014", Name: "Nicolaas Beetsstraat", Latitude: 52.365543, Longitude: 4.8656464},
+		},
+		pairs: map[string][]string{
+			"30006018": {"30006014"},
+			"30006014": {"30006018"},
+		},
+	}
+
+	_, handler := SearchStopsTool(mock)
+
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]any{"query": "Nicolaas"}
+
+	result, err := handler(context.Background(), req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.IsError {
+		t.Fatalf("unexpected error: %s", result.Content[0].(mcp.TextContent).Text)
+	}
+
+	text := result.Content[0].(mcp.TextContent).Text
+	if !strings.Contains(text, `"paired_with":["30006014"]`) {
+		t.Errorf("expected paired_with for 30006018, got %s", text)
+	}
+	if len(mock.lastPairReq) != 2 {
+		t.Errorf("expected 2 codes sent to PairedStopsByCode, got %v", mock.lastPairReq)
+	}
+}
+
+func TestSearchStopsTool_PairingErrorSurfaces(t *testing.T) {
+	mock := &mockStopSearcher{
+		results: []db.Stop{
+			{TPCCode: "30006018", Name: "Nicolaas Beetsstraat"},
+		},
+		pairsErr: errors.New("pair query failed"),
+	}
+
+	_, handler := SearchStopsTool(mock)
+
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]any{"query": "Nicolaas"}
+
+	result, _ := handler(context.Background(), req)
+	if !result.IsError {
+		t.Fatal("expected error result when pairing fails")
+	}
+	if !strings.Contains(result.Content[0].(mcp.TextContent).Text, "pair query failed") {
+		t.Errorf("error text should surface pairing failure, got %q",
+			result.Content[0].(mcp.TextContent).Text)
+	}
+}
+
+func TestSearchStopsTool_OmitPairedWithWhenNone(t *testing.T) {
+	mock := &mockStopSearcher{
+		results: []db.Stop{
+			{TPCCode: "30005011", Name: "Loners Lane"},
+		},
+		pairs: map[string][]string{},
+	}
+
+	_, handler := SearchStopsTool(mock)
+
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]any{"query": "Loners"}
+
+	result, _ := handler(context.Background(), req)
+	text := result.Content[0].(mcp.TextContent).Text
+	if strings.Contains(text, "paired_with") {
+		t.Errorf("expected paired_with to be omitted when empty, got %s", text)
 	}
 }

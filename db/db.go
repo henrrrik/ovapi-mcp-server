@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS stops (
 );
 
 CREATE INDEX IF NOT EXISTS idx_stops_name_trgm ON stops USING GIN (name gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_stops_name ON stops (name);
+CREATE INDEX IF NOT EXISTS idx_stops_coord ON stops (latitude, longitude);
 `
 
 func Open(databaseURL string) (*sql.DB, error) {
