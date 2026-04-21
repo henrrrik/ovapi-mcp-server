@@ -44,6 +44,14 @@ func main() {
 		},
 	}
 
+	log.Println("fetching stop-area town map...")
+	areaTowns, err := fetchStopAreaTowns(ctx, client)
+	if err != nil {
+		log.Printf("warning: stop-area town enrichment disabled: %v", err)
+		areaTowns = map[string]string{}
+	}
+	log.Printf("loaded %d stop-area towns", len(areaTowns))
+
 	log.Println("fetching TPC code list...")
 	codes, err := fetchTPCList(ctx, client)
 	if err != nil {
@@ -52,6 +60,7 @@ func main() {
 	log.Printf("found %d TPC codes", len(codes))
 
 	total := 0
+	enriched := 0
 	batches := (len(codes) + batchSize - 1) / batchSize
 	for i := 0; i < len(codes); i += batchSize {
 		end := i + batchSize
@@ -67,6 +76,8 @@ func main() {
 			continue
 		}
 
+		enriched += enrichTowns(stops, areaTowns)
+
 		if err := db.UpsertStops(ctx, conn, stops); err != nil {
 			log.Printf("batch %d/%d upsert failed: %v", batchNum, batches, err)
 			continue
@@ -76,7 +87,66 @@ func main() {
 		log.Printf("batch %d/%d: upserted %d stops (total: %d)", batchNum, batches, len(stops), total)
 	}
 
-	log.Printf("done: %d stops upserted", total)
+	log.Printf("done: %d stops upserted, %d towns enriched from stop-area data", total, enriched)
+}
+
+// enrichTowns fills in Town for stops whose upstream town is empty or "unknown"
+// using the stop-area-code map. Returns the number of stops enriched.
+func enrichTowns(stops []db.Stop, areaTowns map[string]string) int {
+	n := 0
+	for i := range stops {
+		s := &stops[i]
+		if s.Town != "" && s.Town != "unknown" {
+			continue
+		}
+		if s.StopAreaCode == nil || *s.StopAreaCode == "" {
+			continue
+		}
+		if town, ok := areaTowns[*s.StopAreaCode]; ok && town != "" {
+			s.Town = town
+			n++
+		}
+	}
+	return n
+}
+
+// fetchStopAreaTowns pulls the master /stopareacode/ listing and returns a map
+// of stop-area-code → TimingPointTown.
+func fetchStopAreaTowns(ctx context.Context, client ovapiclient.HTTPDoer) (map[string]string, error) {
+	u := ovapiclient.BuildURL(ovapiBase, "stopareacode") + "/"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("OVapi returned HTTP %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseSize))
+	if err != nil {
+		return nil, err
+	}
+
+	var raw map[string]struct {
+		TimingPointTown string `json:"TimingPointTown"`
+	}
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return nil, err
+	}
+
+	out := make(map[string]string, len(raw))
+	for code, v := range raw {
+		if v.TimingPointTown != "" && v.TimingPointTown != "unknown" {
+			out[code] = v.TimingPointTown
+		}
+	}
+	return out, nil
 }
 
 func fetchTPCList(ctx context.Context, client ovapiclient.HTTPDoer) ([]string, error) {

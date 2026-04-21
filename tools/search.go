@@ -12,6 +12,7 @@ import (
 
 type StopSearcher interface {
 	SearchStops(ctx context.Context, query string, limit int) ([]db.Stop, error)
+	PairedStopsByCode(ctx context.Context, codes []string) (map[string][]string, error)
 }
 
 func SearchStopsTool(searcher StopSearcher) (mcp.Tool, server.ToolHandlerFunc) {
@@ -40,6 +41,10 @@ func SearchStopsTool(searcher StopSearcher) (mcp.Tool, server.ToolHandlerFunc) {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
+		if err := annotatePairs(ctx, searcher, stops); err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
 		data, err := json.Marshal(stops)
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
@@ -49,4 +54,26 @@ func SearchStopsTool(searcher StopSearcher) (mcp.Tool, server.ToolHandlerFunc) {
 	}
 
 	return tool, handler
+}
+
+// annotatePairs fills in PairedWith on each stop. A lookup failure logs nothing
+// and returns the error so the handler can surface it to the caller.
+func annotatePairs(ctx context.Context, searcher StopSearcher, stops []db.Stop) error {
+	if len(stops) == 0 {
+		return nil
+	}
+	codes := make([]string, len(stops))
+	for i, s := range stops {
+		codes[i] = s.TPCCode
+	}
+	pairs, err := searcher.PairedStopsByCode(ctx, codes)
+	if err != nil {
+		return err
+	}
+	for i := range stops {
+		if p, ok := pairs[stops[i].TPCCode]; ok {
+			stops[i].PairedWith = p
+		}
+	}
+	return nil
 }

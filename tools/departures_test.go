@@ -496,6 +496,77 @@ func TestTransformPass_RealtimeFlag(t *testing.T) {
 	}
 }
 
+func TestDeparturesTool_PairedWith(t *testing.T) {
+	defer fixedTime(t)()
+
+	body := loadTestData(t, "tpc_live.json")
+	mockHTTP := newMockDoer(body)
+	mockSearch := &mockStopSearcher{
+		pairs: map[string][]string{
+			"30006018": {"30006014"},
+			"30006014": {"30006018"},
+		},
+	}
+
+	_, handler := DeparturesTool(mockHTTP, mockSearch)
+
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]any{
+		"tpc_code": "30006018,30006014",
+	}
+
+	result, err := handler(context.Background(), req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.IsError {
+		t.Fatalf("unexpected error: %s", result.Content[0].(mcp.TextContent).Text)
+	}
+	text := result.Content[0].(mcp.TextContent).Text
+
+	var parsed LeanResponse
+	if err := json.Unmarshal([]byte(text), &parsed); err != nil {
+		t.Fatalf("invalid json: %v", err)
+	}
+
+	byCode := map[string]LeanStop{}
+	for _, s := range parsed.Stops {
+		byCode[s.TPCCode] = s
+	}
+	if got := byCode["30006018"].PairedWith; len(got) != 1 || got[0] != "30006014" {
+		t.Errorf("stop 30006018: expected paired_with=[30006014], got %v", got)
+	}
+	if got := byCode["30006014"].PairedWith; len(got) != 1 || got[0] != "30006018" {
+		t.Errorf("stop 30006014: expected paired_with=[30006018], got %v", got)
+	}
+	if len(mockSearch.lastPairReq) != 2 {
+		t.Errorf("expected 2 codes sent to PairedStopsByCode, got %v", mockSearch.lastPairReq)
+	}
+}
+
+func TestDeparturesTool_NilSearcher_SkipsPairing(t *testing.T) {
+	defer fixedTime(t)()
+
+	body := loadTestData(t, "tpc_live.json")
+	mockHTTP := newMockDoer(body)
+
+	_, handler := DeparturesTool(mockHTTP, nil)
+
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]any{
+		"tpc_code": "30006018",
+	}
+
+	result, _ := handler(context.Background(), req)
+	if result.IsError {
+		t.Fatalf("unexpected error: %s", result.Content[0].(mcp.TextContent).Text)
+	}
+	text := result.Content[0].(mcp.TextContent).Text
+	if strings.Contains(text, "paired_with") {
+		t.Errorf("expected no paired_with when searcher is nil, got %s", text)
+	}
+}
+
 func TestTransformPass_DelaySeconds(t *testing.T) {
 	dep, _ := transformPass("id", rawPass{
 		LinePublicNumber:      "1",

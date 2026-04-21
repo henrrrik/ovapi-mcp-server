@@ -56,6 +56,10 @@ func DeparturesTool(client ovapiclient.HTTPDoer, searcher StopSearcher) (mcp.Too
 		}
 
 		lean := transformTPC(raw, filters)
+		if err := annotateLeanPairs(ctx, searcher, lean.Stops); err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
 		out, err := json.Marshal(lean)
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
@@ -111,6 +115,28 @@ func clampLimit(v, def, lo, hi int) int {
 		return def
 	}
 	return v
+}
+
+// annotateLeanPairs populates PairedWith on each lean stop. When the searcher is
+// nil (no database configured) or the input list is empty, it is a no-op.
+func annotateLeanPairs(ctx context.Context, searcher StopSearcher, stops []LeanStop) error {
+	if searcher == nil || len(stops) == 0 {
+		return nil
+	}
+	codes := make([]string, len(stops))
+	for i, s := range stops {
+		codes[i] = s.TPCCode
+	}
+	pairs, err := searcher.PairedStopsByCode(ctx, codes)
+	if err != nil {
+		return err
+	}
+	for i := range stops {
+		if p, ok := pairs[stops[i].TPCCode]; ok {
+			stops[i].PairedWith = p
+		}
+	}
+	return nil
 }
 
 // fetchBytes performs the upstream GET and returns the body, or an MCP error result.
