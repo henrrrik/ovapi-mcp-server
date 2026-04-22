@@ -54,6 +54,7 @@ type linesIndexFilters struct {
 	modes        []string // normalized lowercase; "ferry" is mapped to upstream "boat"
 	owners       []string // compared case-insensitively
 	nameContains string   // compared case-insensitively; matches LineName or LinePublicNumber or id
+	publicNumber string   // exact case-insensitive match on LinePublicNumber
 	limit        int      // 0 means DefaultLinesIndexLimit
 }
 
@@ -152,24 +153,26 @@ func transformLinesIndex(raw rawLinesIndex, f linesIndexFilters) LeanLinesIndexR
 }
 
 func matchesLineFilter(id string, e rawLineIndexEntry, f linesIndexFilters) bool {
-	if len(f.modes) > 0 {
-		mode := strings.ToLower(e.TransportType)
-		if !containsString(f.modes, mode) {
-			return false
-		}
+	if len(f.modes) > 0 && !containsString(f.modes, strings.ToLower(e.TransportType)) {
+		return false
 	}
 	if len(f.owners) > 0 && !containsFold(f.owners, e.DataOwnerCode) {
 		return false
 	}
-	if f.nameContains != "" {
-		needle := strings.ToLower(f.nameContains)
-		if !strings.Contains(strings.ToLower(e.LineName), needle) &&
-			!strings.Contains(strings.ToLower(e.LinePublicNumber), needle) &&
-			!strings.Contains(strings.ToLower(id), needle) {
-			return false
-		}
+	if f.publicNumber != "" && !strings.EqualFold(f.publicNumber, e.LinePublicNumber) {
+		return false
 	}
-	return true
+	return matchesNameContains(id, e, f.nameContains)
+}
+
+func matchesNameContains(id string, e rawLineIndexEntry, needle string) bool {
+	if needle == "" {
+		return true
+	}
+	n := strings.ToLower(needle)
+	return strings.Contains(strings.ToLower(e.LineName), n) ||
+		strings.Contains(strings.ToLower(e.LinePublicNumber), n) ||
+		strings.Contains(strings.ToLower(id), n)
 }
 
 func containsString(haystack []string, needle string) bool {

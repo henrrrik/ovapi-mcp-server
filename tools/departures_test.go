@@ -52,8 +52,10 @@ func TestDeparturesTool_LegacyFixtureRoundTrips(t *testing.T) {
 	if mockSearch.lastQ != "Centraal Station" {
 		t.Errorf("expected search query 'Centraal Station', got %q", mockSearch.lastQ)
 	}
-	if mockSearch.lastLim != 3 {
-		t.Errorf("expected default limit 3, got %d", mockSearch.lastLim)
+	// get_departures now over-fetches and re-ranks the same way search_stops
+	// does, so the DB sees default limit (3) * fanout.
+	if want := 3 * searchCandidateFanout; mockSearch.lastLim != want {
+		t.Errorf("expected DB limit %d, got %d", want, mockSearch.lastLim)
 	}
 	url := mockHTTP.lastReq.URL.String()
 	if !strings.Contains(url, "/tpc/30005011,30005020") {
@@ -145,8 +147,8 @@ func TestDeparturesTool_LimitClamping(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if mockSearch.lastLim != 10 {
-		t.Errorf("expected clamped limit 10, got %d", mockSearch.lastLim)
+	if want := 10 * searchCandidateFanout; mockSearch.lastLim != want {
+		t.Errorf("expected DB limit %d (clamped 10 * fanout), got %d", want, mockSearch.lastLim)
 	}
 }
 
@@ -564,6 +566,34 @@ func TestDeparturesTool_NilSearcher_SkipsPairing(t *testing.T) {
 	text := result.Content[0].(mcp.TextContent).Text
 	if strings.Contains(text, "paired_with") {
 		t.Errorf("expected no paired_with when searcher is nil, got %s", text)
+	}
+}
+
+// TestDeparturesTool_StopNameGoesThroughRanker guards against the regression
+// where /get_departures?stop_name=Schiphol resolved to "Schipholweg" (a
+// Leiden bus stop) because the handler bypassed the rank logic and used raw
+// pg_trgm ordering. The rank-aware resolver should pick the hub.
+func TestDeparturesTool_StopNameGoesThroughRanker(t *testing.T) {
+	mockHTTP := newMockDoer("{}")
+	mockSearch := &mockStopSearcher{
+		// Order intentionally reflects raw pg_trgm ranking — Schipholweg first.
+		results: []db.Stop{
+			{TPCCode: "weg", Name: "Schipholweg"},
+			{TPCCode: "airport", Name: "Schiphol, Airport", StopAreaCode: ptrString("schns")},
+		},
+	}
+
+	_, handler := DeparturesTool(mockHTTP, mockSearch)
+
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]any{"stop_name": "Schiphol", "limit": float64(1)}
+
+	if _, err := handler(context.Background(), req); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	url := mockHTTP.lastReq.URL.String()
+	if !strings.HasSuffix(url, "/tpc/airport") {
+		t.Errorf("expected /tpc/airport (hub), got %s", url)
 	}
 }
 

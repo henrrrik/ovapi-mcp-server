@@ -262,6 +262,47 @@ func TestLinesIndex_NameContains_PublicNumberMatch(t *testing.T) {
 	}
 }
 
+func TestLinesIndex_PublicNumberExact(t *testing.T) {
+	body := loadTestData(t, "lines_live.json")
+	// name_contains='1' would match "1", "10", "11", "17", "N1", etc.
+	// public_number='1' must match only the exact string "1".
+	resp := parseLinesIndex(t, body, linesIndexFilters{publicNumber: "1"})
+
+	if len(resp.Lines) == 0 {
+		t.Fatal("expected at least one line with public_number=1")
+	}
+	for _, l := range resp.Lines {
+		if l.PublicNumber != "1" {
+			t.Errorf("public_number filter leaked %q", l.PublicNumber)
+		}
+	}
+}
+
+func TestLinesIndex_PublicNumberCaseInsensitive(t *testing.T) {
+	body := `{"GVB_N1_1":{"LinePublicNumber":"N1","DataOwnerCode":"GVB","LineName":"Night","TransportType":"BUS","LineDirection":1}}`
+	resp := parseLinesIndex(t, body, linesIndexFilters{publicNumber: "n1"})
+
+	if resp.Total != 1 {
+		t.Errorf("expected 1 match for case-insensitive public_number, got %d", resp.Total)
+	}
+}
+
+func TestLinesIndex_PublicNumberAndOwnerCompose(t *testing.T) {
+	body := loadTestData(t, "lines_live.json")
+	resp := parseLinesIndex(t, body, linesIndexFilters{
+		owners:       []string{"GVB"},
+		publicNumber: "17",
+	})
+	if len(resp.Lines) == 0 {
+		t.Fatal("expected GVB line 17 entries")
+	}
+	for _, l := range resp.Lines {
+		if !strings.EqualFold(l.Owner, "GVB") || l.PublicNumber != "17" {
+			t.Errorf("filter leak: %+v", l)
+		}
+	}
+}
+
 func TestLinesIndex_EmptyFilter_ReturnsEmptyArray(t *testing.T) {
 	body := loadTestData(t, "lines_live.json")
 	resp := parseLinesIndex(t, body, linesIndexFilters{owners: []string{"NOSUCHOWNER"}})

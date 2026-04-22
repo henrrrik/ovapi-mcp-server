@@ -18,31 +18,55 @@ import (
 func DeparturesTool(client ovapiclient.HTTPDoer, searcher StopSearcher) (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("get_departures",
 		mcp.WithDescription(
-			"Get real-time departures for a Dutch public transport stop. Accepts either a fuzzy stop name or one or more TPC codes. "+
-				"Returns a lean shape by default; set verbose=true for the raw upstream response (filters are still applied to verbose).\n\n"+
-				"Coverage: KV78turbo bus/tram/metro/ferry only. NS trains are not included.\n\n"+
-				"Each departure's 'status' is one of:\n"+
+			"Get real-time departures for a Dutch public transport stop. Accepts either "+
+				"a fuzzy stop name (resolved via the same ranker as search_stops, so "+
+				"'Schiphol' → 'Schiphol, Airport') or one or more TPC codes. Returns a lean "+
+				"shape by default; set verbose=true for the raw upstream response (filters "+
+				"still apply).\n\n"+
+				"Coverage: the KV78turbo feed — Dutch bus, tram, metro and ferry. Covers "+
+				"operators including GVB (Amsterdam), HTM (The Hague), RET (Rotterdam), "+
+				"Qbuzz, Connexxion (CXX), Arriva (ARR), EBS, Keolis, and regional concessions. "+
+				"NS intercity/sprinter trains are NOT included — they run on the separate "+
+				"NS Reisinformatie API which this server does not proxy.\n\n"+
+				"Each departure's 'status' is the upstream TripStopStatus verbatim:\n"+
 				"  - PLANNED   — scheduled, no realtime tracking yet\n"+
 				"  - DRIVING   — vehicle in transit, realtime tracked\n"+
 				"  - ARRIVED   — at or very near the stop\n"+
 				"  - PASSED    — already departed\n"+
-				"  - CANCEL    — cancelled\n"+
-				"  - OFFROUTE  — detouring or off schedule\n\n"+
+				"  - CANCEL    — cancelled (note: upstream code, not 'CANCELLED')\n"+
+				"  - OFFROUTE  — detouring or off schedule\n"+
 				"Callers filtering for 'upcoming' should exclude PASSED and CANCEL.\n\n"+
+				"Each departure's 'mode' is the lowercased upstream TransportType, one of: "+
+				"'bus', 'tram', 'metro', 'boat' (ferry). No 'train' value appears because NS "+
+				"is not covered.\n\n"+
+				"Realtime-dependent fields on each departure are commonly null when the "+
+				"vehicle is PLANNED (no realtime data yet): 'platform' (SideCode), "+
+				"'wheelchair_accessible' (collapsed to null when upstream says 'UNKNOWN'), "+
+				"and 'number_of_coaches' (null when upstream reports 0). 'delay_seconds' is "+
+				"0 until expected diverges from planned.\n\n"+
 				"'display' is a human-friendly countdown and is always populated when the "+
 				"departure has a known planned or expected time: 'Nu', 'N min', 'HH:MM', or "+
-				"'Net vertrokken' (just left).",
+				"'Net vertrokken' (just left).\n\n"+
+				"Filter semantics — 'line' matches LinePublicNumber exactly (case-insensitive). "+
+				"'direction' is a case-insensitive substring match against the destination "+
+				"name (e.g. 'centraal' matches 'Amsterdam Centraal'). When a 'line' filter "+
+				"returns no departures for a stop, the response cannot distinguish 'line does "+
+				"not serve this stop' from 'line serves it but has no upcoming departures' — "+
+				"use search_stops + lines to check static coverage if that distinction matters. "+
+				"Filter order: 'time_window_minutes' is applied first (during pass transform), "+
+				"then 'max_departures' caps the per-stop count after departures are sorted by "+
+				"planned time.",
 		),
-		mcp.WithString("stop_name", mcp.Description("Fuzzy stop name (e.g. 'Amsterdam Centraal'). One of stop_name or tpc_code is required.")),
+		mcp.WithString("stop_name", mcp.Description("Fuzzy stop name (e.g. 'Amsterdam Centraal', 'Schiphol'). Resolved via the same ranked search as search_stops: hub stops with Centraal/Airport/Station names, stop_area_code, or multiple paired platforms win over prefix-sharing minor stops. One of stop_name or tpc_code is required.")),
 		mcp.WithString("tpc_code", mcp.Description("Timing point code, or comma-separated list of codes (e.g. '30006018' or '30006018,30006014'). Skips fuzzy search.")),
 		mcp.WithNumber("limit", mcp.Description("When using stop_name: maximum number of matching stops to fetch departures for (default 3, max 10). Ignored when tpc_code is provided.")),
-		mcp.WithString("line", mcp.Description("Filter departures to a single line by public number (e.g. '17').")),
-		mcp.WithString("direction", mcp.Description("Filter departures whose destination name contains this substring (case-insensitive).")),
-		mcp.WithNumber("time_window_minutes", mcp.Description("Only return departures planned within the next N minutes.")),
-		mcp.WithNumber("max_departures", mcp.Description("Maximum number of departures per stop after filtering.")),
+		mcp.WithString("line", mcp.Description("Filter departures to a single line by public number (e.g. '17'). Case-insensitive exact match against LinePublicNumber.")),
+		mcp.WithString("direction", mcp.Description("Filter departures whose destination name contains this substring (case-insensitive). E.g. 'centraal' matches destinations like 'Amsterdam Centraal'.")),
+		mcp.WithNumber("time_window_minutes", mcp.Description("Only return departures planned within the next N minutes. Applied before max_departures.")),
+		mcp.WithNumber("max_departures", mcp.Description("Maximum number of departures per stop after time_window_minutes, direction, and line filters are applied and departures sorted by planned time.")),
 		mcp.WithBoolean("include_paired", mcp.Description("When using tpc_code: auto-expand the query to include paired TPCs (opposite-direction platforms etc). Default false.")),
 		mcp.WithBoolean("drop_empty", mcp.Description("Omit stops whose departures list is empty after filtering. Default false.")),
-		mcp.WithBoolean("verbose", mcp.Description("If true, return the raw upstream response instead of the lean shape. Filters still apply. Default false.")),
+		mcp.WithBoolean("verbose", mcp.Description("If true, return the raw upstream OVapi response instead of the lean shape — useful for debugging field mapping or pulling upstream fields not surfaced in the lean shape. Filters still apply. Default false.")),
 	)
 
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -104,20 +128,23 @@ func resolveCodes(ctx context.Context, request mcp.CallToolRequest, searcher Sto
 	if tpc := strings.TrimSpace(request.GetString("tpc_code", "")); tpc != "" {
 		return parseTPCCodes(tpc)
 	}
-	name := request.GetString("stop_name", "")
+	name := strings.TrimSpace(request.GetString("stop_name", ""))
 	if name == "" {
 		return nil, mcp.NewToolResultError("one of stop_name or tpc_code is required")
 	}
 	limit := clampLimit(int(request.GetInt("limit", 3)), 3, 1, 10)
-	stops, err := searcher.SearchStops(ctx, name, limit)
+	// Go through the full ranker (not raw pg_trgm) so hub stops win over
+	// length-similar prefix matches — e.g. "Schiphol" resolves to
+	// "Schiphol, Airport" rather than "Schipholweg".
+	ranked, err := resolveRankedStops(ctx, searcher, name, limit)
 	if err != nil {
 		return nil, mcp.NewToolResultError(err.Error())
 	}
-	if len(stops) == 0 {
+	if len(ranked) == 0 {
 		return nil, mcp.NewToolResultError("no stops found matching '" + name + "'")
 	}
-	codes := make([]string, len(stops))
-	for i, s := range stops {
+	codes := make([]string, len(ranked))
+	for i, s := range ranked {
 		codes[i] = s.TPCCode
 	}
 	return codes, nil
