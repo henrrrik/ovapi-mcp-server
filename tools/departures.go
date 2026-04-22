@@ -21,8 +21,17 @@ func DeparturesTool(client ovapiclient.HTTPDoer, searcher StopSearcher) (mcp.Too
 			"Get real-time departures for a Dutch public transport stop. Accepts either a fuzzy stop name or one or more TPC codes. "+
 				"Returns a lean shape by default; set verbose=true for the raw upstream response (filters are still applied to verbose).\n\n"+
 				"Coverage: KV78turbo bus/tram/metro/ferry only. NS trains are not included.\n\n"+
-				"Per-departure 'status' vocabulary from the BISON feed: PLANNED, DRIVING, ARRIVED, PASSED, OFFROUTE, CANCEL. "+
-				"'display' gives a human-friendly countdown ('Nu', 'N min', or 'HH:MM').",
+				"Each departure's 'status' is one of:\n"+
+				"  - PLANNED   — scheduled, no realtime tracking yet\n"+
+				"  - DRIVING   — vehicle in transit, realtime tracked\n"+
+				"  - ARRIVED   — at or very near the stop\n"+
+				"  - PASSED    — already departed\n"+
+				"  - CANCEL    — cancelled\n"+
+				"  - OFFROUTE  — detouring or off schedule\n\n"+
+				"Callers filtering for 'upcoming' should exclude PASSED and CANCEL.\n\n"+
+				"'display' is a human-friendly countdown and is always populated when the "+
+				"departure has a known planned or expected time: 'Nu', 'N min', 'HH:MM', or "+
+				"'Net vertrokken' (just left).",
 		),
 		mcp.WithString("stop_name", mcp.Description("Fuzzy stop name (e.g. 'Amsterdam Centraal'). One of stop_name or tpc_code is required.")),
 		mcp.WithString("tpc_code", mcp.Description("Timing point code, or comma-separated list of codes (e.g. '30006018' or '30006018,30006014'). Skips fuzzy search.")),

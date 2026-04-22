@@ -11,19 +11,27 @@ import (
 // The thresholds are close enough that a small hub boost can nudge a
 // borderline result across tiers without overwhelming the intent of the
 // query.
-// Tier ceilings leave room for a fixed hub boost and still cap at 1000. The
-// gaps are wide enough that a hub boost never bumps a lower tier past a
-// higher-tier base score.
+// Tier ceilings leave room for a scaled hub boost (up to +100) while keeping
+// everything inside the 0-1000 band. Exact matches hit the cap outright.
 const (
-	scoreExactFullMatch        = 950
+	scoreExactFullMatch        = 1000
 	scoreAllTokensWordBoundary = 800
 	scoreAllTokensSubstring    = 650
 	scoreSomeTokensMatch       = 350
-	scoreHubBoost              = 50
 	scoreMaxCap                = 1000
 	scoreFloor                 = 200
 	scoreMinQueryLength        = 3
 	searchCandidateFanout      = 4
+
+	// Hub boost components. Paired_with is scaled (+10/entry up to +50),
+	// stop_area_code is a flat +25, and a canonical hub name (Airport,
+	// Centraal, or *Station) adds another +25. An exact-match result
+	// (already at the cap) is unaffected; boost can lift a word-boundary
+	// match to 900, still below an exact match.
+	hubBoostPerPair       = 10
+	hubBoostPairedCap     = 50
+	hubBoostStopAreaCode  = 25
+	hubBoostCanonicalName = 25
 )
 
 // SearchResultStop is the shape returned by search_stops. It re-exposes the
@@ -73,7 +81,7 @@ func scoreStop(query string, queryTokens []string, s db.Stop, paired []string) S
 	score := 0
 	lowerName := strings.ToLower(strings.TrimSpace(s.Name))
 	lowerQuery := strings.ToLower(strings.TrimSpace(query))
-	nameTokens := tokenize(s.Name)
+	nameTokens := expandHubAliases(tokenize(s.Name))
 
 	switch {
 	case lowerName == lowerQuery:
@@ -86,8 +94,10 @@ func scoreStop(query string, queryTokens []string, s db.Stop, paired []string) S
 		score = scoreSomeTokensMatch
 	}
 
-	if isHub(s, paired) {
-		score += scoreHubBoost
+	// Hub boost only lifts non-exact matches; exact matches are already at
+	// the cap so further points would be clipped anyway.
+	if score > 0 && score < scoreExactFullMatch {
+		score += hubBoost(s, paired)
 	}
 	if score > scoreMaxCap {
 		score = scoreMaxCap
@@ -113,14 +123,35 @@ func scoreStop(query string, queryTokens []string, s db.Stop, paired []string) S
 	}
 }
 
-func isHub(s db.Stop, paired []string) bool {
-	if len(paired) >= 2 {
-		return true
+// hubBoost returns a scaled bonus rewarding true interchanges. Paired stops,
+// a stop_area_code, and a canonical hub name each contribute independently.
+func hubBoost(s db.Stop, paired []string) int {
+	boost := 0
+	if n := len(paired); n > 0 {
+		p := n * hubBoostPerPair
+		if p > hubBoostPairedCap {
+			p = hubBoostPairedCap
+		}
+		boost += p
 	}
 	if s.StopAreaCode != nil && *s.StopAreaCode != "" {
+		boost += hubBoostStopAreaCode
+	}
+	if isCanonicalHubName(s.Name) {
+		boost += hubBoostCanonicalName
+	}
+	return boost
+}
+
+func isCanonicalHubName(name string) bool {
+	lower := strings.ToLower(name)
+	if strings.Contains(lower, "airport") {
 		return true
 	}
-	return false
+	if strings.Contains(lower, "centraal") {
+		return true
+	}
+	return strings.HasSuffix(lower, "station")
 }
 
 // tokenize splits on whitespace and common separators, lowercases, and drops
@@ -133,6 +164,39 @@ func tokenize(s string) []string {
 		}
 		return false
 	})
+}
+
+// hubAliases is applied to stop-name tokens only. Dutch station names use
+// "CS" and "Centraal Station" interchangeably (plus sometimes just
+// "Centraal"). Expanding the indexed name makes queries like "Utrecht
+// Centraal" match "Utrecht, CS Centrumzijde" without rewriting the query
+// side, keeping exact-match semantics intact.
+var hubAliases = map[string][]string{
+	"cs":       {"centraal", "station"},
+	"centraal": {"cs"},
+	"station":  {"cs"},
+}
+
+func expandHubAliases(tokens []string) []string {
+	seen := make(map[string]bool, len(tokens)*2)
+	for _, t := range tokens {
+		seen[t] = true
+	}
+	for _, t := range tokens {
+		for _, alias := range hubAliases[t] {
+			seen[alias] = true
+		}
+	}
+	out := make([]string, 0, len(seen))
+	for _, t := range tokens {
+		out = append(out, t)
+	}
+	for alias := range seen {
+		if !containsString(tokens, alias) {
+			out = append(out, alias)
+		}
+	}
+	return out
 }
 
 // allTokensAtWordBoundary returns true when every query token equals some

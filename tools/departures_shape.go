@@ -152,7 +152,7 @@ func transformPass(id string, p rawPass, filters departureFilters, now time.Time
 		DelaySeconds:         delay,
 		Status:               p.TripStopStatus,
 		Realtime:             p.TripStopStatus != "" && p.TripStopStatus != "PLANNED",
-		Display:              computeDisplay(expected, now),
+		Display:              computeDisplay(planned, expected, now),
 		Platform:             optionalString(p.SideCode),
 		WheelchairAccessible: optionalString(normalizeAccessibility(p.WheelChairAccessible)),
 		NumberOfCoaches:      optionalCoaches(p.NumberOfCoaches),
@@ -224,16 +224,33 @@ func sortDeparturesByPlanned(deps []LeanDeparture) {
 	}
 }
 
-// computeDisplay renders a human-friendly countdown against 'now'. Returns
-// "Nu" (within 1 min), "N min" (up to 20 min), or "HH:MM" (local). Empty
-// string when expected is unknown or the stop has already left.
-func computeDisplay(expected, now time.Time) string {
-	if expected.IsZero() {
+// computeDisplay renders a human-friendly countdown against 'now'. Guarantees
+// a non-empty string whenever at least one of planned/expected is set, so
+// callers never need to worry about nil display on PASSED departures.
+//
+//   - just-left (within 1 min past): "Net vertrokken"
+//   - further in the past:           HH:MM of the scheduled time
+//   - within 1 min future:           "Nu"
+//   - up to 20 min future:           "N min"
+//   - beyond 20 min future:          HH:MM
+func computeDisplay(planned, expected, now time.Time) string {
+	ref := expected
+	if ref.IsZero() {
+		ref = planned
+	}
+	if ref.IsZero() {
 		return ""
 	}
-	delta := expected.Sub(now)
-	if delta < -30*time.Second {
-		return ""
+	delta := ref.Sub(now)
+	if delta < 0 {
+		if delta > -time.Minute {
+			return "Net vertrokken"
+		}
+		fallback := planned
+		if fallback.IsZero() {
+			fallback = ref
+		}
+		return fallback.In(amsterdamLoc).Format("15:04")
 	}
 	mins := int(delta.Round(time.Minute) / time.Minute)
 	switch {
@@ -242,7 +259,7 @@ func computeDisplay(expected, now time.Time) string {
 	case mins <= 20:
 		return fmt.Sprintf("%d min", mins)
 	default:
-		return expected.In(amsterdamLoc).Format("15:04")
+		return ref.In(amsterdamLoc).Format("15:04")
 	}
 }
 

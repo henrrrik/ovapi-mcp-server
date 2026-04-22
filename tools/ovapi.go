@@ -29,9 +29,9 @@ func LinesTool(client ovapiclient.HTTPDoer) (mcp.Tool, server.ToolHandlerFunc) {
 				"Coverage: KV78turbo (Dutch bus/tram/metro/ferry). NS trains are not included.",
 		),
 		mcp.WithString("line_id", mcp.Description("Specific line identifier (e.g. 'GVB_17_1'). Format: '{owner}_{public_number}_{direction}'. Omit to list all lines.")),
-		mcp.WithString("mode", mcp.Description("Filter by transport mode: 'bus', 'tram', 'metro', 'boat'.")),
-		mcp.WithString("owner", mcp.Description("Filter by operator data-owner code (e.g. 'GVB', 'QBUZZ', 'NL', 'CXX'). Case-insensitive.")),
-		mcp.WithString("name_contains", mcp.Description("Case-insensitive substring match on line name, public number, or id.")),
+		mcp.WithString("mode", mcp.Description("Filter by transport mode. Accepts comma-separated values, e.g. 'tram,metro'. Known modes: 'bus', 'tram', 'metro', 'boat' (alias: 'ferry'). 'train' is accepted but returns no results (NS trains are not in KV78turbo).")),
+		mcp.WithString("owner", mcp.Description("Filter by operator data-owner code (e.g. 'GVB', 'QBUZZ', 'NL', 'CXX'). Case-insensitive. Comma-separated for multiple, e.g. 'GVB,HTM'.")),
+		mcp.WithString("name_contains", mcp.Description("Case-insensitive substring match on line name or public number (e.g. '17' matches line 17 across operators, 'sprinter' matches sprinter-named lines).")),
 		mcp.WithNumber("limit", mcp.Description("Max entries to return for the no-arg index (default 500, max 5000).")),
 		mcp.WithBoolean("verbose", mcp.Description("If true, return the raw upstream response instead of the lean shape. Default false.")),
 	)
@@ -81,8 +81,8 @@ func handleLinesIndex(ctx context.Context, client ovapiclient.HTTPDoer, request 
 		return mcp.NewToolResultError("failed to parse upstream response: " + err.Error()), nil
 	}
 	filters := linesIndexFilters{
-		mode:         strings.ToLower(strings.TrimSpace(request.GetString("mode", ""))),
-		owner:        strings.TrimSpace(request.GetString("owner", "")),
+		modes:        normalizeModeFilters(splitCSV(request.GetString("mode", ""))),
+		owners:       splitCSV(request.GetString("owner", "")),
 		nameContains: strings.TrimSpace(request.GetString("name_contains", "")),
 		limit:        int(request.GetInt("limit", 0)),
 	}

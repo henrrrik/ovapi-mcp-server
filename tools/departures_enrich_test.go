@@ -134,6 +134,77 @@ func TestDeparturesLean_Display_FarShowsHHMM(t *testing.T) {
 	}
 }
 
+func TestDeparturesLean_Display_PassedRecent(t *testing.T) {
+	loc, _ := time.LoadLocation("Europe/Amsterdam")
+	now := time.Date(2026, 4, 22, 10, 0, 0, 0, loc)
+	prev := timeNow
+	timeNow = func() time.Time { return now }
+	defer func() { timeNow = prev }()
+
+	// Expected 09:59:32 (28s before now), planned 10:00:00 (delay -28s), PASSED.
+	body := `{"X":{"Stop":{"TimingPointCode":"X","TimingPointName":"UMC","StopAreaCode":null},"Passes":{"J1":{"LinePublicNumber":"20","TargetDepartureTime":"2026-04-22T10:00:00","ExpectedDepartureTime":"2026-04-22T09:59:32","TripStopStatus":"PASSED"}},"GeneralMessages":{}}}`
+
+	mockHTTP := newMockDoer(body)
+	_, handler := DeparturesTool(mockHTTP, nil)
+
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]any{"tpc_code": "X"}
+	result, _ := handler(context.Background(), req)
+	text := result.Content[0].(mcp.TextContent).Text
+
+	var resp LeanResponse
+	if err := json.Unmarshal([]byte(result.Content[0].(mcp.TextContent).Text), &resp); err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if len(resp.Stops) != 1 || len(resp.Stops[0].Departures) != 1 {
+		t.Fatalf("expected 1 departure, got %s", text)
+	}
+	if got := resp.Stops[0].Departures[0].Display; got != "Net vertrokken" {
+		t.Errorf("expected 'Net vertrokken' for just-passed, got %q", got)
+	}
+}
+
+func TestDeparturesLean_Display_PassedLongAgoFallsBackToHHMM(t *testing.T) {
+	loc, _ := time.LoadLocation("Europe/Amsterdam")
+	now := time.Date(2026, 4, 22, 10, 5, 0, 0, loc)
+	prev := timeNow
+	timeNow = func() time.Time { return now }
+	defer func() { timeNow = prev }()
+
+	// Expected 5 minutes ago — well past the "net vertrokken" window.
+	body := `{"X":{"Stop":{"TimingPointCode":"X","TimingPointName":"UMC","StopAreaCode":null},"Passes":{"J1":{"LinePublicNumber":"20","TargetDepartureTime":"2026-04-22T10:00:00","ExpectedDepartureTime":"2026-04-22T10:00:00","TripStopStatus":"PASSED"}},"GeneralMessages":{}}}`
+
+	mockHTTP := newMockDoer(body)
+	_, handler := DeparturesTool(mockHTTP, nil)
+
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]any{"tpc_code": "X"}
+	result, _ := handler(context.Background(), req)
+	var resp LeanResponse
+	_ = json.Unmarshal([]byte(result.Content[0].(mcp.TextContent).Text), &resp)
+
+	if got := resp.Stops[0].Departures[0].Display; got != "10:00" {
+		t.Errorf("expected HH:MM fallback '10:00', got %q", got)
+	}
+}
+
+func TestDeparturesLean_Display_NeverEmpty(t *testing.T) {
+	// Across the full fixture at a pinned time, every departure should have
+	// a non-empty display — the regression this test guards against.
+	defer fixedTime(t)()
+	resp := runLeanFromFixture(t, "tpc_live.json", map[string]any{
+		"tpc_code": "30006018,30006014",
+	})
+	for _, s := range resp.Stops {
+		for _, d := range s.Departures {
+			if d.Display == "" {
+				t.Errorf("stop %s dep %s (status=%s delay=%d): display empty",
+					s.TPCCode, d.JourneyID, d.Status, d.DelaySeconds)
+			}
+		}
+	}
+}
+
 func TestDeparturesLean_SentinelCoord_YieldsNull(t *testing.T) {
 	defer fixedTime(t)()
 	// Minimal upstream-shaped fixture with sentinel coord.
