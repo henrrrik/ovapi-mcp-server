@@ -269,9 +269,24 @@ func TestLinesIndex_EmptyFilter_ReturnsEmptyArray(t *testing.T) {
 	if len(resp.Lines) != 0 {
 		t.Errorf("expected empty list, got %d", len(resp.Lines))
 	}
+	if resp.Total != 0 {
+		t.Errorf("expected total=0, got %d", resp.Total)
+	}
+	if resp.Truncated {
+		t.Error("expected truncated=false for empty result")
+	}
 	out, _ := json.Marshal(resp)
 	if !strings.Contains(string(out), `"lines":[]`) {
 		t.Errorf("expected empty array, got %s", out)
+	}
+	// Acceptance: empty match returns {"lines": [], "total": 0, "truncated": false}
+	// — serialization must show total:0 and must NOT show truncated:true. With
+	// omitempty, truncated:false is elided entirely.
+	if !strings.Contains(string(out), `"total":0`) {
+		t.Errorf("expected total:0 in JSON, got %s", out)
+	}
+	if strings.Contains(string(out), `"truncated":true`) {
+		t.Errorf("expected truncated absent or false, got %s", out)
 	}
 }
 
