@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -13,67 +14,70 @@ import (
 type StopSearcher interface {
 	SearchStops(ctx context.Context, query string, limit int) ([]db.Stop, error)
 	PairedStopsByCode(ctx context.Context, codes []string) (map[string][]string, error)
+	StopsInBBox(ctx context.Context, minLat, maxLat, minLng, maxLng float64, limit int) ([]db.Stop, error)
+}
+
+// SearchResponse is the top-level shape for search_stops. Using a wrapper
+// makes it easy to add metadata fields (count, truncated, etc) later without
+// another breaking change.
+type SearchResponse struct {
+	Stops []SearchResultStop `json:"stops"`
 }
 
 func SearchStopsTool(searcher StopSearcher) (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("search_stops",
-		mcp.WithDescription("Search for Dutch public transport stops by name. Returns matching stops with TPC codes, names, and coordinates."),
-		mcp.WithString("query", mcp.Required(), mcp.Description("Search query for stop name (e.g. 'Amsterdam Centraal', 'Utrecht', 'Schiphol')")),
+		mcp.WithDescription(
+			"Search for Dutch public transport stops by name. Returns stops ranked by "+
+				"match quality with a 'score' (0-1000): 1000 for exact full-name matches, "+
+				"~850 when every query token appears at a word boundary, ~700 for substring "+
+				"matches, lower for partial. Interchange/hub stops get a small boost.\n\n"+
+				"Queries shorter than 3 characters return an empty list. Each result may "+
+				"include 'paired_with' — other TPC codes for the same physical stop, "+
+				"typically the opposite-direction platform or adjacent quay.",
+		),
+		mcp.WithString("query", mcp.Required(), mcp.Description("Search query for stop name (e.g. 'Amsterdam Centraal', 'Utrecht', 'Schiphol'). Minimum 3 characters.")),
 		mcp.WithNumber("limit", mcp.Description("Maximum number of results to return (default 10, max 50)")),
 	)
 
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		query := request.GetString("query", "")
+		query := strings.TrimSpace(request.GetString("query", ""))
 		if query == "" {
 			return mcp.NewToolResultError("query is required"), nil
 		}
 
-		limit := int(request.GetInt("limit", 10))
-		if limit > 50 {
-			limit = 50
-		}
-		if limit < 1 {
-			limit = 10
+		limit := clampLimit(int(request.GetInt("limit", 10)), 10, 1, 50)
+
+		if len([]rune(query)) < scoreMinQueryLength {
+			return writeSearchResponse(SearchResponse{Stops: []SearchResultStop{}})
 		}
 
-		stops, err := searcher.SearchStops(ctx, query, limit)
+		// Over-fetch and re-rank in Go so we can apply tiered scoring that
+		// a plain pg_trgm ORDER BY cannot express.
+		candidates, err := searcher.SearchStops(ctx, query, limit*searchCandidateFanout)
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
-		if err := annotatePairs(ctx, searcher, stops); err != nil {
-			return mcp.NewToolResultError(err.Error()), nil
+		codes := make([]string, len(candidates))
+		for i, s := range candidates {
+			codes[i] = s.TPCCode
 		}
-
-		data, err := json.Marshal(stops)
+		pairs, err := searcher.PairedStopsByCode(ctx, codes)
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
-		return mcp.NewToolResultText(string(data)), nil
+		ranked := scoreAndRank(query, candidates, pairs, limit)
+		return writeSearchResponse(SearchResponse{Stops: ranked})
 	}
 
 	return tool, handler
 }
 
-// annotatePairs fills in PairedWith on each stop. A lookup failure logs nothing
-// and returns the error so the handler can surface it to the caller.
-func annotatePairs(ctx context.Context, searcher StopSearcher, stops []db.Stop) error {
-	if len(stops) == 0 {
-		return nil
-	}
-	codes := make([]string, len(stops))
-	for i, s := range stops {
-		codes[i] = s.TPCCode
-	}
-	pairs, err := searcher.PairedStopsByCode(ctx, codes)
+func writeSearchResponse(resp SearchResponse) (*mcp.CallToolResult, error) {
+	data, err := json.Marshal(resp)
 	if err != nil {
-		return err
+		return mcp.NewToolResultError(err.Error()), nil
 	}
-	for i := range stops {
-		if p, ok := pairs[stops[i].TPCCode]; ok {
-			stops[i].PairedWith = p
-		}
-	}
-	return nil
+	return mcp.NewToolResultText(string(data)), nil
 }

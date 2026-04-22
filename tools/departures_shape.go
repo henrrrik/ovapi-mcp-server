@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"fmt"
 	"strings"
 	"time"
 )
@@ -32,6 +33,9 @@ type rawPass struct {
 	ExpectedDepartureTime string `json:"ExpectedDepartureTime"`
 	TripStopStatus        string `json:"TripStopStatus"`
 	LastUpdateTimeStamp   string `json:"LastUpdateTimeStamp"`
+	SideCode              string `json:"SideCode"`
+	WheelChairAccessible  string `json:"WheelChairAccessible"`
+	NumberOfCoaches       int    `json:"NumberOfCoaches"`
 }
 
 type rawMessage struct {
@@ -47,22 +51,26 @@ type LeanStop struct {
 	TPCCode    string          `json:"tpc_code"`
 	Name       string          `json:"name"`
 	Town       string          `json:"town,omitempty"`
-	Coord      [2]float64      `json:"coord"`
+	Coord      *[2]float64     `json:"coord"`
 	PairedWith []string        `json:"paired_with,omitempty"`
 	Departures []LeanDeparture `json:"departures"`
 	Messages   []string        `json:"messages"`
 }
 
 type LeanDeparture struct {
-	Line         string `json:"line"`
-	Mode         string `json:"mode"`
-	Destination  string `json:"destination"`
-	Planned      string `json:"planned"`
-	Expected     string `json:"expected"`
-	DelaySeconds int    `json:"delay_seconds"`
-	Status       string `json:"status"`
-	Realtime     bool   `json:"realtime"`
-	JourneyID    string `json:"journey_id"`
+	Line                 string  `json:"line"`
+	Mode                 string  `json:"mode"`
+	Destination          string  `json:"destination"`
+	Planned              string  `json:"planned"`
+	Expected             string  `json:"expected"`
+	DelaySeconds         int     `json:"delay_seconds"`
+	Status               string  `json:"status"`
+	Realtime             bool    `json:"realtime"`
+	Display              string  `json:"display,omitempty"`
+	Platform             *string `json:"platform"`
+	WheelchairAccessible *string `json:"wheelchair_accessible"`
+	NumberOfCoaches      *int    `json:"number_of_coaches"`
+	JourneyID            string  `json:"journey_id"`
 }
 
 // departureFilters are the post-fetch filters applied to each stop's passes.
@@ -89,26 +97,24 @@ var timeNow = time.Now
 
 // transformTPC converts the upstream response into the lean shape, applying filters.
 func transformTPC(raw rawTPCResponse, filters departureFilters) LeanResponse {
+	now := timeNow().In(amsterdamLoc)
 	out := LeanResponse{Stops: make([]LeanStop, 0, len(raw))}
 	for _, entry := range raw {
-		out.Stops = append(out.Stops, transformStop(entry, filters))
+		out.Stops = append(out.Stops, transformStop(entry, filters, now))
 	}
 	return out
 }
 
-func transformStop(entry rawStopEntry, filters departureFilters) LeanStop {
+func transformStop(entry rawStopEntry, filters departureFilters, now time.Time) LeanStop {
 	stop := LeanStop{
 		TPCCode:    entry.Stop.TimingPointCode,
 		Name:       entry.Stop.TimingPointName,
-		Coord:      [2]float64{entry.Stop.Latitude, entry.Stop.Longitude},
+		Town:       townOrEmpty(entry.Stop.TimingPointTown, entry.Stop.TimingPointName),
+		Coord:      cleanCoord(entry.Stop.Latitude, entry.Stop.Longitude),
 		Departures: []LeanDeparture{},
 		Messages:   collectMessages(entry.GeneralMessages),
 	}
-	if entry.Stop.TimingPointTown != "" && entry.Stop.TimingPointTown != "unknown" {
-		stop.Town = entry.Stop.TimingPointTown
-	}
 
-	now := timeNow().In(amsterdamLoc)
 	for id, pass := range entry.Passes {
 		dep, ok := transformPass(id, pass, filters, now)
 		if !ok {
@@ -137,17 +143,22 @@ func transformPass(id string, p rawPass, filters departureFilters, now time.Time
 		delay = int(expected.Sub(planned).Seconds())
 	}
 
-	return LeanDeparture{
-		Line:         p.LinePublicNumber,
-		Mode:         strings.ToLower(p.TransportType),
-		Destination:  p.DestinationName50,
-		Planned:      formatWithOffset(planned),
-		Expected:     formatWithOffset(expected),
-		DelaySeconds: delay,
-		Status:       p.TripStopStatus,
-		Realtime:     p.TripStopStatus != "" && p.TripStopStatus != "PLANNED",
-		JourneyID:    id,
-	}, true
+	dep := LeanDeparture{
+		Line:                 p.LinePublicNumber,
+		Mode:                 strings.ToLower(p.TransportType),
+		Destination:          p.DestinationName50,
+		Planned:              formatWithOffset(planned),
+		Expected:             formatWithOffset(expected),
+		DelaySeconds:         delay,
+		Status:               p.TripStopStatus,
+		Realtime:             p.TripStopStatus != "" && p.TripStopStatus != "PLANNED",
+		Display:              computeDisplay(expected, now),
+		Platform:             optionalString(p.SideCode),
+		WheelchairAccessible: optionalString(normalizeAccessibility(p.WheelChairAccessible)),
+		NumberOfCoaches:      optionalCoaches(p.NumberOfCoaches),
+		JourneyID:            id,
+	}
+	return dep, true
 }
 
 func passesFilters(p rawPass, f departureFilters, planned, now time.Time) bool {
@@ -211,4 +222,40 @@ func sortDeparturesByPlanned(deps []LeanDeparture) {
 			deps[j-1], deps[j] = deps[j], deps[j-1]
 		}
 	}
+}
+
+// computeDisplay renders a human-friendly countdown against 'now'. Returns
+// "Nu" (within 1 min), "N min" (up to 20 min), or "HH:MM" (local). Empty
+// string when expected is unknown or the stop has already left.
+func computeDisplay(expected, now time.Time) string {
+	if expected.IsZero() {
+		return ""
+	}
+	delta := expected.Sub(now)
+	if delta < -30*time.Second {
+		return ""
+	}
+	mins := int(delta.Round(time.Minute) / time.Minute)
+	switch {
+	case mins < 1:
+		return "Nu"
+	case mins <= 20:
+		return fmt.Sprintf("%d min", mins)
+	default:
+		return expected.In(amsterdamLoc).Format("15:04")
+	}
+}
+
+func optionalString(v string) *string {
+	if v == "" {
+		return nil
+	}
+	return &v
+}
+
+func optionalCoaches(n int) *int {
+	if n <= 0 {
+		return nil
+	}
+	return &n
 }

@@ -30,6 +30,7 @@ func NewOVapiServer(client ovapiclient.HTTPDoer, searcher tools.StopSearcher) *s
 	if searcher != nil {
 		add(tools.DeparturesTool(client, searcher))
 		add(tools.SearchStopsTool(searcher))
+		add(tools.FindStopsNearTool(searcher))
 	}
 
 	return s
