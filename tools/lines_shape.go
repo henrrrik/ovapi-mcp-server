@@ -49,10 +49,54 @@ type LeanLinesIndexResponse struct {
 }
 
 type linesIndexFilters struct {
-	mode         string // normalized lowercase
-	owner        string // compared case-insensitively
-	nameContains string // compared case-insensitively; matches LineName or LinePublicNumber or id
-	limit        int    // 0 means DefaultLinesIndexLimit
+	// modes and owners both support multi-value (caller passes comma-separated
+	// strings, parsed into these slices). An empty slice means "any".
+	modes        []string // normalized lowercase; "ferry" is mapped to upstream "boat"
+	owners       []string // compared case-insensitively
+	nameContains string   // compared case-insensitively; matches LineName or LinePublicNumber or id
+	limit        int      // 0 means DefaultLinesIndexLimit
+}
+
+// modeAliases maps caller-friendly mode names to the normalized lowercase
+// form of upstream's TransportType. Upstream emits "BOAT" for ferries.
+// "train" has no matches in KV78 (NS is a separate feed) but is accepted so
+// callers get a clean empty list rather than an error.
+var modeAliases = map[string]string{
+	"ferry": "boat",
+}
+
+func normalizeModeFilters(raw []string) []string {
+	out := make([]string, 0, len(raw))
+	seen := make(map[string]bool, len(raw))
+	for _, m := range raw {
+		m = strings.ToLower(strings.TrimSpace(m))
+		if m == "" {
+			continue
+		}
+		if canonical, ok := modeAliases[m]; ok {
+			m = canonical
+		}
+		if !seen[m] {
+			seen[m] = true
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+// splitCSV returns non-empty trimmed fragments of a comma-separated value.
+func splitCSV(s string) []string {
+	if s == "" {
+		return nil
+	}
+	parts := strings.Split(s, ",")
+	out := parts[:0]
+	for _, p := range parts {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 // transformLinesIndex converts the raw upstream map into a compact filtered,
@@ -108,10 +152,13 @@ func transformLinesIndex(raw rawLinesIndex, f linesIndexFilters) LeanLinesIndexR
 }
 
 func matchesLineFilter(id string, e rawLineIndexEntry, f linesIndexFilters) bool {
-	if f.mode != "" && strings.ToLower(e.TransportType) != f.mode {
-		return false
+	if len(f.modes) > 0 {
+		mode := strings.ToLower(e.TransportType)
+		if !containsString(f.modes, mode) {
+			return false
+		}
 	}
-	if f.owner != "" && !strings.EqualFold(e.DataOwnerCode, f.owner) {
+	if len(f.owners) > 0 && !containsFold(f.owners, e.DataOwnerCode) {
 		return false
 	}
 	if f.nameContains != "" {
@@ -123,6 +170,24 @@ func matchesLineFilter(id string, e rawLineIndexEntry, f linesIndexFilters) bool
 		}
 	}
 	return true
+}
+
+func containsString(haystack []string, needle string) bool {
+	for _, h := range haystack {
+		if h == needle {
+			return true
+		}
+	}
+	return false
+}
+
+func containsFold(haystack []string, needle string) bool {
+	for _, h := range haystack {
+		if strings.EqualFold(h, needle) {
+			return true
+		}
+	}
+	return false
 }
 
 // comparePublicNumber orders numeric-looking public numbers by integer value,

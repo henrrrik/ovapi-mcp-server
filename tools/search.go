@@ -29,11 +29,18 @@ func SearchStopsTool(searcher StopSearcher) (mcp.Tool, server.ToolHandlerFunc) {
 		mcp.WithDescription(
 			"Search for Dutch public transport stops by name. Returns stops ranked by "+
 				"match quality with a 'score' (0-1000): 1000 for exact full-name matches, "+
-				"~850 when every query token appears at a word boundary, ~700 for substring "+
-				"matches, lower for partial. Interchange/hub stops get a small boost.\n\n"+
+				"800 when every query token appears at a word boundary of the stop name, "+
+				"650 for substring matches, 350 for partial. True interchanges/hub stops "+
+				"(stops with a stop_area_code, multiple paired platforms, or canonical "+
+				"names like 'Centraal' or '*Station') get a scaled boost that can lift "+
+				"them up to ~100 points higher.\n\n"+
+				"Station-name aliases are normalized: 'CS' matches 'Centraal Station' and "+
+				"vice versa, so 'Utrecht Centraal' finds 'Utrecht, CS Centrumzijde' and "+
+				"'Den Haag CS' finds 'Den Haag, Centraal Station'.\n\n"+
 				"Queries shorter than 3 characters return an empty list. Each result may "+
 				"include 'paired_with' — other TPC codes for the same physical stop, "+
-				"typically the opposite-direction platform or adjacent quay.",
+				"typically the opposite-direction platform, an adjacent quay, or a "+
+				"rail-side versus bus-side entry.",
 		),
 		mcp.WithString("query", mcp.Required(), mcp.Description("Search query for stop name (e.g. 'Amsterdam Centraal', 'Utrecht', 'Schiphol'). Minimum 3 characters.")),
 		mcp.WithNumber("limit", mcp.Description("Maximum number of results to return (default 10, max 50)")),

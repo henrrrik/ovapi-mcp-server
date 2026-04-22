@@ -73,7 +73,7 @@ func TestLinesIndex_LimitRespected(t *testing.T) {
 
 func TestLinesIndex_NoTruncationOnSmallFilteredSet(t *testing.T) {
 	body := loadTestData(t, "lines_live.json")
-	resp := parseLinesIndex(t, body, linesIndexFilters{owner: "GVB", mode: "tram"})
+	resp := parseLinesIndex(t, body, linesIndexFilters{owners: []string{"GVB"}, modes: []string{"tram"}})
 
 	if resp.Truncated {
 		t.Errorf("did not expect truncation for small filtered set (%d lines)", resp.Total)
@@ -83,9 +83,114 @@ func TestLinesIndex_NoTruncationOnSmallFilteredSet(t *testing.T) {
 	}
 }
 
+func TestLinesIndex_MultiModeFilter(t *testing.T) {
+	body := loadTestData(t, "lines_live.json")
+	resp := parseLinesIndex(t, body, linesIndexFilters{modes: []string{"tram", "metro"}})
+
+	if len(resp.Lines) == 0 {
+		t.Fatal("expected some tram+metro lines")
+	}
+	sawTram, sawMetro := false, false
+	for _, l := range resp.Lines {
+		switch l.Mode {
+		case "tram":
+			sawTram = true
+		case "metro":
+			sawMetro = true
+		default:
+			t.Errorf("unexpected mode %q in tram+metro filter", l.Mode)
+		}
+	}
+	if !sawTram || !sawMetro {
+		t.Errorf("expected both tram and metro in results, tram=%v metro=%v", sawTram, sawMetro)
+	}
+}
+
+func TestLinesIndex_MultiOwnerFilter(t *testing.T) {
+	body := loadTestData(t, "lines_live.json")
+	resp := parseLinesIndex(t, body, linesIndexFilters{owners: []string{"GVB", "HTM"}})
+
+	if len(resp.Lines) == 0 {
+		t.Fatal("expected some GVB+HTM lines")
+	}
+	for _, l := range resp.Lines {
+		if !strings.EqualFold(l.Owner, "GVB") && !strings.EqualFold(l.Owner, "HTM") {
+			t.Errorf("unexpected owner %q", l.Owner)
+		}
+	}
+}
+
+func TestLinesIndex_FerryAliasMapsToBoat(t *testing.T) {
+	body := loadTestData(t, "lines_live.json")
+	got := parseLinesIndex(t, body, linesIndexFilters{
+		modes: normalizeModeFilters([]string{"ferry"}),
+	})
+	want := parseLinesIndex(t, body, linesIndexFilters{modes: []string{"boat"}})
+	if got.Total != want.Total {
+		t.Errorf("ferry alias: total=%d, boat total=%d", got.Total, want.Total)
+	}
+	if got.Total == 0 {
+		t.Error("expected some BOAT lines in fixture")
+	}
+}
+
+func TestLinesIndex_TrainAcceptedButEmpty(t *testing.T) {
+	body := loadTestData(t, "lines_live.json")
+	resp := parseLinesIndex(t, body, linesIndexFilters{
+		modes: normalizeModeFilters([]string{"train"}),
+	})
+	if resp.Total != 0 {
+		t.Errorf("expected 0 train lines in KV78 feed, got %d", resp.Total)
+	}
+	if resp.Truncated {
+		t.Error("empty result should not be marked truncated")
+	}
+}
+
+func TestLinesIndex_FilterBeforeTruncation_FindsMetros(t *testing.T) {
+	// Metros are far down the alphabetical sort when unfiltered; without
+	// filter-before-truncate, mode=metro would return an empty list from
+	// the top-500 slice.
+	body := loadTestData(t, "lines_live.json")
+	resp := parseLinesIndex(t, body, linesIndexFilters{modes: []string{"metro"}})
+
+	if resp.Total == 0 {
+		t.Fatal("expected metros in production fixture")
+	}
+	for _, l := range resp.Lines {
+		if l.Mode != "metro" {
+			t.Errorf("expected metro only, got %q", l.Mode)
+		}
+	}
+}
+
+func TestSplitCSV(t *testing.T) {
+	cases := []struct {
+		in   string
+		want []string
+	}{
+		{"", nil},
+		{"a", []string{"a"}},
+		{"a,b,c", []string{"a", "b", "c"}},
+		{" a , b ,,c,", []string{"a", "b", "c"}},
+	}
+	for _, tc := range cases {
+		got := splitCSV(tc.in)
+		if len(got) != len(tc.want) {
+			t.Errorf("splitCSV(%q) = %v, want %v", tc.in, got, tc.want)
+			continue
+		}
+		for i, v := range got {
+			if v != tc.want[i] {
+				t.Errorf("splitCSV(%q)[%d] = %q, want %q", tc.in, i, v, tc.want[i])
+			}
+		}
+	}
+}
+
 func TestLinesIndex_ModeFilter(t *testing.T) {
 	body := loadTestData(t, "lines_live.json")
-	resp := parseLinesIndex(t, body, linesIndexFilters{mode: "tram"})
+	resp := parseLinesIndex(t, body, linesIndexFilters{modes: []string{"tram"}})
 
 	if len(resp.Lines) == 0 {
 		t.Fatal("expected some tram lines")
@@ -99,7 +204,7 @@ func TestLinesIndex_ModeFilter(t *testing.T) {
 
 func TestLinesIndex_OwnerFilter(t *testing.T) {
 	body := loadTestData(t, "lines_live.json")
-	resp := parseLinesIndex(t, body, linesIndexFilters{owner: "GVB"})
+	resp := parseLinesIndex(t, body, linesIndexFilters{owners: []string{"GVB"}})
 
 	if len(resp.Lines) == 0 {
 		t.Fatal("expected some GVB lines")
@@ -113,7 +218,7 @@ func TestLinesIndex_OwnerFilter(t *testing.T) {
 
 func TestLinesIndex_OwnerAndModeCombined(t *testing.T) {
 	body := loadTestData(t, "lines_live.json")
-	resp := parseLinesIndex(t, body, linesIndexFilters{owner: "GVB", mode: "tram"})
+	resp := parseLinesIndex(t, body, linesIndexFilters{owners: []string{"GVB"}, modes: []string{"tram"}})
 
 	if len(resp.Lines) == 0 {
 		t.Fatal("expected some GVB tram lines")
@@ -139,7 +244,7 @@ func TestLinesIndex_NameContainsFilter(t *testing.T) {
 
 func TestLinesIndex_NameContains_PublicNumberMatch(t *testing.T) {
 	body := loadTestData(t, "lines_live.json")
-	resp := parseLinesIndex(t, body, linesIndexFilters{owner: "GVB", nameContains: "17"})
+	resp := parseLinesIndex(t, body, linesIndexFilters{owners: []string{"GVB"}, nameContains: "17"})
 
 	if len(resp.Lines) == 0 {
 		t.Fatal("expected GVB line 17 to match")
@@ -159,7 +264,7 @@ func TestLinesIndex_NameContains_PublicNumberMatch(t *testing.T) {
 
 func TestLinesIndex_EmptyFilter_ReturnsEmptyArray(t *testing.T) {
 	body := loadTestData(t, "lines_live.json")
-	resp := parseLinesIndex(t, body, linesIndexFilters{owner: "NOSUCHOWNER"})
+	resp := parseLinesIndex(t, body, linesIndexFilters{owners: []string{"NOSUCHOWNER"}})
 
 	if len(resp.Lines) != 0 {
 		t.Errorf("expected empty list, got %d", len(resp.Lines))
@@ -172,7 +277,7 @@ func TestLinesIndex_EmptyFilter_ReturnsEmptyArray(t *testing.T) {
 
 func TestLinesIndex_SortedStable(t *testing.T) {
 	body := loadTestData(t, "lines_live.json")
-	resp := parseLinesIndex(t, body, linesIndexFilters{owner: "GVB", mode: "tram"})
+	resp := parseLinesIndex(t, body, linesIndexFilters{owners: []string{"GVB"}, modes: []string{"tram"}})
 
 	prevOwner, prevNum, prevDir := "", -1, -1
 	for _, l := range resp.Lines {

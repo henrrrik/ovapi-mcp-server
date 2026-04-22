@@ -123,14 +123,14 @@ func TestSearchScore_MultiTokenRejectsPartialMatches(t *testing.T) {
 
 func TestSearchScore_HubBoostFromStopAreaCode(t *testing.T) {
 	mock := &mockStopSearcher{results: []db.Stop{
-		{TPCCode: "P", Name: "Plaza", StopAreaCode: ptrString("AREA1")},
-		{TPCCode: "Q", Name: "Plaza"},
+		{TPCCode: "P", Name: "Plaza Zuid", StopAreaCode: ptrString("AREA1")},
+		{TPCCode: "Q", Name: "Plaza Zuid"},
 	}}
+	// Query "Plaza" is a word-boundary match (not exact), so the boost applies.
 	resp := runSearchTool(t, mock, map[string]any{"query": "Plaza"})
 	if len(resp.Stops) < 2 {
 		t.Fatalf("expected 2 results, got %d", len(resp.Stops))
 	}
-	// P and Q have the same name but P has a stop_area_code → higher score.
 	var pScore, qScore int
 	for _, s := range resp.Stops {
 		if s.TPCCode == "P" {
@@ -139,23 +139,24 @@ func TestSearchScore_HubBoostFromStopAreaCode(t *testing.T) {
 			qScore = s.Score
 		}
 	}
-	if pScore <= qScore {
-		t.Errorf("expected hub P score > Q; got %d vs %d", pScore, qScore)
+	if pScore-qScore != hubBoostStopAreaCode {
+		t.Errorf("expected stop_area_code boost of %d; got P=%d Q=%d",
+			hubBoostStopAreaCode, pScore, qScore)
 	}
 }
 
-func TestSearchScore_HubBoostFromMultiplePairs(t *testing.T) {
+func TestSearchScore_HubBoostScalesWithPairCount(t *testing.T) {
 	mock := &mockStopSearcher{
 		results: []db.Stop{
-			{TPCCode: "H", Name: "Station"},
-			{TPCCode: "S", Name: "Station"},
+			{TPCCode: "H", Name: "Zuidplein halte"},
+			{TPCCode: "S", Name: "Zuidplein halte"},
 		},
 		pairs: map[string][]string{
-			"H": {"H2", "H3"}, // 2+ pairs → hub
-			"S": {"S2"},
+			"H": {"H2", "H3"}, // 2 pairs → +20
+			"S": {"S2"},       // 1 pair  → +10
 		},
 	}
-	resp := runSearchTool(t, mock, map[string]any{"query": "Station"})
+	resp := runSearchTool(t, mock, map[string]any{"query": "Zuidplein"})
 	if len(resp.Stops) < 2 {
 		t.Fatalf("expected 2 results, got %d", len(resp.Stops))
 	}
@@ -167,8 +168,124 @@ func TestSearchScore_HubBoostFromMultiplePairs(t *testing.T) {
 			sScore = st.Score
 		}
 	}
-	if hScore <= sScore {
-		t.Errorf("expected H (3 paired) score > S (1 paired); got %d vs %d", hScore, sScore)
+	if want := hubBoostPerPair; hScore-sScore != want {
+		t.Errorf("expected per-pair gap of %d (2 pairs vs 1); got H=%d S=%d", want, hScore, sScore)
+	}
+}
+
+func TestSearchScore_HubBoostFromCanonicalName(t *testing.T) {
+	mock := &mockStopSearcher{results: []db.Stop{
+		{TPCCode: "A", Name: "Schiphol, Airport"},
+		{TPCCode: "B", Name: "Schiphol Plaza"},
+	}}
+	resp := runSearchTool(t, mock, map[string]any{"query": "Schiphol"})
+	if len(resp.Stops) < 2 {
+		t.Fatalf("expected 2 results")
+	}
+	// Schiphol Airport hits the canonical-name boost (+25); Plaza does not.
+	var aScore, bScore int
+	for _, s := range resp.Stops {
+		switch s.TPCCode {
+		case "A":
+			aScore = s.Score
+		case "B":
+			bScore = s.Score
+		}
+	}
+	if aScore-bScore != hubBoostCanonicalName {
+		t.Errorf("expected canonical-name boost of %d; got A=%d B=%d",
+			hubBoostCanonicalName, aScore, bScore)
+	}
+}
+
+func TestSearchScore_Schiphol_AirportBeatsInterchange(t *testing.T) {
+	// Regression: Knooppunt Schiphol Nrd scored the same as the airport.
+	mock := &mockStopSearcher{
+		results: []db.Stop{
+			{TPCCode: "57330760", Name: "Schiphol, Airport", StopAreaCode: ptrString("schns")},
+			{TPCCode: "00000001", Name: "Knooppunt Schiphol Nrd"},
+		},
+		pairs: map[string][]string{
+			"57330760": {"a", "b", "c", "d", "e"}, // 5 platforms
+			"00000001": {"a2"},                    // highway stop, lonely
+		},
+	}
+	resp := runSearchTool(t, mock, map[string]any{"query": "Schiphol"})
+	if len(resp.Stops) < 2 {
+		t.Fatal("expected both results")
+	}
+	if resp.Stops[0].TPCCode != "57330760" {
+		t.Errorf("expected airport first, got %q (%q)",
+			resp.Stops[0].TPCCode, resp.Stops[0].Name)
+	}
+}
+
+func TestSearchScore_ExactMatchNotBoosted(t *testing.T) {
+	// Exact-match query must score exactly the cap, regardless of hub
+	// features — the boost would otherwise go negative (already capped).
+	mock := &mockStopSearcher{results: []db.Stop{
+		{TPCCode: "A", Name: "Amsterdam Centraal", StopAreaCode: ptrString("AREA")},
+		{TPCCode: "B", Name: "Amsterdam Centraal"},
+	}}
+	resp := runSearchTool(t, mock, map[string]any{"query": "Amsterdam Centraal"})
+	if len(resp.Stops) < 2 {
+		t.Fatal("expected 2 exact matches")
+	}
+	for _, s := range resp.Stops {
+		if s.Score != scoreExactFullMatch {
+			t.Errorf("expected exact score %d, got %d for %q",
+				scoreExactFullMatch, s.Score, s.TPCCode)
+		}
+	}
+}
+
+func TestSearchScore_CSAlias_UtrechtCentraalFindsCS(t *testing.T) {
+	// Regression: "Utrecht Centraal" previously scored "Utrecht, CS Centrumzijde"
+	// below the floor because neither "CS" nor "Centrumzijde" matched
+	// "Centraal" as tokens.
+	mock := &mockStopSearcher{results: []db.Stop{
+		{TPCCode: "90000438", Name: "Utrecht, CS Centrumzijde"},
+		{TPCCode: "90000439", Name: "Utrecht, CS Jaarbeurszijde"},
+		{TPCCode: "ZOO", Name: "Utrecht, Centraal Museum"},
+	}}
+	resp := runSearchTool(t, mock, map[string]any{"query": "Utrecht Centraal"})
+	if len(resp.Stops) == 0 {
+		t.Fatal("expected some results")
+	}
+	hasCS := false
+	for _, s := range resp.Stops {
+		if s.TPCCode == "90000438" {
+			hasCS = true
+			break
+		}
+	}
+	if !hasCS {
+		t.Errorf("expected CS Centrumzijde (90000438) among results, got %+v", resp.Stops)
+	}
+}
+
+func TestSearchScore_CSQueryFindsCentraal(t *testing.T) {
+	// Symmetric: a bare "CS" query should reach stops named only "Centraal".
+	mock := &mockStopSearcher{results: []db.Stop{
+		{TPCCode: "A", Name: "Den Haag, Centraal Station"},
+	}}
+	resp := runSearchTool(t, mock, map[string]any{"query": "Den Haag CS"})
+	if len(resp.Stops) == 0 {
+		t.Error("expected 'Den Haag CS' to find 'Den Haag, Centraal Station'")
+	}
+}
+
+func TestSearchScore_ExactMatchStillScoresCapWithAlias(t *testing.T) {
+	// Alias expansion must not destabilize exact-match detection.
+	mock := &mockStopSearcher{results: []db.Stop{
+		{TPCCode: "R", Name: "Rotterdam Centraal"},
+	}}
+	resp := runSearchTool(t, mock, map[string]any{"query": "Rotterdam Centraal"})
+	if len(resp.Stops) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(resp.Stops))
+	}
+	if resp.Stops[0].Score != scoreExactFullMatch {
+		t.Errorf("expected exact score %d, got %d", scoreExactFullMatch, resp.Stops[0].Score)
 	}
 }
 
