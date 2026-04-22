@@ -49,13 +49,18 @@ func DeparturesTool(client ovapiclient.HTTPDoer, searcher StopSearcher) (mcp.Too
 				"'Net vertrokken' (just left).\n\n"+
 				"Filter semantics — 'line' matches LinePublicNumber exactly (case-insensitive). "+
 				"'direction' is a case-insensitive substring match against the destination "+
-				"name (e.g. 'centraal' matches 'Amsterdam Centraal'). When a 'line' filter "+
-				"returns no departures for a stop, the response cannot distinguish 'line does "+
-				"not serve this stop' from 'line serves it but has no upcoming departures' — "+
-				"use search_stops + lines to check static coverage if that distinction matters. "+
-				"Filter order: 'time_window_minutes' is applied first (during pass transform), "+
-				"then 'max_departures' caps the per-stop count after departures are sorted by "+
-				"planned time.",
+				"name (e.g. 'centraal' matches 'Amsterdam Centraal'). Filter order: "+
+				"'time_window_minutes' is applied first (during pass transform), then "+
+				"'max_departures' caps the per-stop count after departures are sorted by "+
+				"planned time.\n\n"+
+				"When a 'line' filter is passed, each stop carries a 'line_served_here' "+
+				"bool — true when the filtered line appears in the upstream response for "+
+				"that stop (so an empty departures list means other filters trimmed it, "+
+				"not that the line skips the stop), false when no pass for that line is "+
+				"in the current window. Omitted when no 'line' filter is set. A false "+
+				"value still cannot distinguish 'line never serves this stop' from 'line "+
+				"serves it but has no passes in the current upstream window' — use the "+
+				"lines tool's route[] to confirm static coverage when that matters.",
 		),
 		mcp.WithString("stop_name", mcp.Description("Fuzzy stop name (e.g. 'Amsterdam Centraal', 'Schiphol'). Resolved via the same ranked search as search_stops: hub stops with Centraal/Airport/Station names, stop_area_code, or multiple paired platforms win over prefix-sharing minor stops. One of stop_name or tpc_code is required.")),
 		mcp.WithString("tpc_code", mcp.Description("Timing point code, or comma-separated list of codes (e.g. '30006018' or '30006018,30006014'). Skips fuzzy search.")),
