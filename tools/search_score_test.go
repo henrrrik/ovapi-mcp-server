@@ -333,6 +333,125 @@ func TestSearchScore_TownOmittedWhenUnknownAndNoPrefix(t *testing.T) {
 	}
 }
 
+// TestSearchScore_CityQueries_FavorHubs pins the behaviour called out in the
+// review: when a bare city name is ambiguous between a major hub and a minor
+// stop sharing a prefix, the hub must win. Before the rank boosts, queries
+// like "Schiphol" would surface "Schipholweg" (a Leiden bus stop) above
+// "Schiphol, Airport" because pg_trgm similarity favours closer length.
+func TestSearchScore_CityQueries_FavorHubs(t *testing.T) {
+	cases := []struct {
+		name       string
+		query      string
+		candidates []db.Stop
+		wantWinner string // TPCCode of the expected top result
+	}{
+		{
+			name:  "Schiphol picks the airport, not the Leiden bus stop",
+			query: "Schiphol",
+			candidates: []db.Stop{
+				{TPCCode: "airport", Name: "Schiphol, Airport", StopAreaCode: ptrString("schns")},
+				{TPCCode: "weg", Name: "Schipholweg"},
+			},
+			wantWinner: "airport",
+		},
+		{
+			name:  "Amsterdam picks Centraal over a random street",
+			query: "Amsterdam",
+			candidates: []db.Stop{
+				{TPCCode: "acs", Name: "Amsterdam, Centraal Station", StopAreaCode: ptrString("asdcs")},
+				{TPCCode: "asw", Name: "Amsterdamsestraatweg"},
+			},
+			wantWinner: "acs",
+		},
+		{
+			name:  "Utrecht picks Centraal over Utrechtseweg",
+			query: "Utrecht",
+			candidates: []db.Stop{
+				{TPCCode: "ucs", Name: "Utrecht Centraal", StopAreaCode: ptrString("utc")},
+				{TPCCode: "uw", Name: "Utrechtseweg"},
+			},
+			wantWinner: "ucs",
+		},
+		{
+			name:  "Rotterdam picks Centraal over Rotterdamsestraat",
+			query: "Rotterdam",
+			candidates: []db.Stop{
+				{TPCCode: "rcs", Name: "Rotterdam Centraal", StopAreaCode: ptrString("rtd")},
+				{TPCCode: "rs", Name: "Rotterdamsestraat"},
+			},
+			wantWinner: "rcs",
+		},
+		{
+			name:  "Den Haag picks Centraal Station over a tram stop",
+			query: "Den Haag",
+			candidates: []db.Stop{
+				{TPCCode: "dhs", Name: "Den Haag, Centraal Station", StopAreaCode: ptrString("gvc")},
+				{TPCCode: "dhf", Name: "Den Haag, Frederikstraat"},
+			},
+			wantWinner: "dhs",
+		},
+		{
+			name:  "Leiden picks Centraal over Leidsestraat",
+			query: "Leiden",
+			candidates: []db.Stop{
+				{TPCCode: "lcs", Name: "Leiden Centraal", StopAreaCode: ptrString("ledn")},
+				{TPCCode: "ls", Name: "Leidsestraat"},
+			},
+			wantWinner: "lcs",
+		},
+		{
+			name:  "Eindhoven picks the Station over a random road",
+			query: "Eindhoven",
+			candidates: []db.Stop{
+				{TPCCode: "ecs", Name: "Eindhoven, Centraal Station", StopAreaCode: ptrString("ehv")},
+				{TPCCode: "ed", Name: "Eindhovensedijk"},
+			},
+			wantWinner: "ecs",
+		},
+		{
+			name:  "Amersfoort picks Centraal over Amersfoortseweg",
+			query: "Amersfoort",
+			candidates: []db.Stop{
+				{TPCCode: "amfs", Name: "Amersfoort Centraal", StopAreaCode: ptrString("amf")},
+				{TPCCode: "afw", Name: "Amersfoortseweg"},
+			},
+			wantWinner: "amfs",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			mock := &mockStopSearcher{results: tc.candidates}
+			resp := runSearchTool(t, mock, map[string]any{"query": tc.query})
+			if len(resp.Stops) == 0 {
+				t.Fatalf("expected at least one result for query %q", tc.query)
+			}
+			if resp.Stops[0].TPCCode != tc.wantWinner {
+				t.Errorf("query %q: want winner %q (%q), got %q (%q) with scores %+v",
+					tc.query, tc.wantWinner, nameOf(tc.candidates, tc.wantWinner),
+					resp.Stops[0].TPCCode, resp.Stops[0].Name, scoreSummary(resp.Stops))
+			}
+		})
+	}
+}
+
+func nameOf(stops []db.Stop, tpc string) string {
+	for _, s := range stops {
+		if s.TPCCode == tpc {
+			return s.Name
+		}
+	}
+	return ""
+}
+
+func scoreSummary(stops []SearchResultStop) []string {
+	out := make([]string, 0, len(stops))
+	for _, s := range stops {
+		out = append(out, s.TPCCode+"="+s.Name)
+	}
+	return out
+}
+
 func mustJSON(t *testing.T, v any) string {
 	t.Helper()
 	b, err := json.Marshal(v)

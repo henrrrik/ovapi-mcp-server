@@ -25,13 +25,17 @@ const (
 
 	// Hub boost components. Paired_with is scaled (+10/entry up to +50),
 	// stop_area_code is a flat +25, and a canonical hub name (Airport,
-	// Centraal, or *Station) adds another +25. An exact-match result
-	// (already at the cap) is unaffected; boost can lift a word-boundary
-	// match to 900, still below an exact match.
+	// Centraal, or *Station) adds another +25. A token-prefix bonus (+30)
+	// rewards names whose leading tokens exactly match the query — this
+	// is what lets "Schiphol" pick "Schiphol, Airport" over "Knooppunt
+	// Schiphol Nrd" even when both are token-boundary matches. An
+	// exact-match result (already at the cap) is unaffected; the maximum
+	// boost is +130, which keeps non-exact matches below the 1000 cap.
 	hubBoostPerPair       = 10
 	hubBoostPairedCap     = 50
 	hubBoostStopAreaCode  = 25
 	hubBoostCanonicalName = 25
+	hubBoostTokenPrefix   = 30
 )
 
 // SearchResultStop is the shape returned by search_stops. It re-exposes the
@@ -78,49 +82,55 @@ func scoreAndRank(query string, candidates []db.Stop, pairs map[string][]string,
 }
 
 func scoreStop(query string, queryTokens []string, s db.Stop, paired []string) SearchResultStop {
-	score := 0
 	lowerName := strings.ToLower(strings.TrimSpace(s.Name))
 	lowerQuery := strings.ToLower(strings.TrimSpace(query))
 	nameTokens := expandHubAliases(tokenize(s.Name))
 
-	switch {
-	case lowerName == lowerQuery:
-		score = scoreExactFullMatch
-	case allTokensAtWordBoundary(queryTokens, nameTokens):
-		score = scoreAllTokensWordBoundary
-	case allTokensAsSubstrings(queryTokens, lowerName):
-		score = scoreAllTokensSubstring
-	case anyTokenAsSubstring(queryTokens, lowerName):
-		score = scoreSomeTokensMatch
-	}
-
+	score := baseTierScore(lowerName, lowerQuery, queryTokens, nameTokens)
 	// Hub boost only lifts non-exact matches; exact matches are already at
 	// the cap so further points would be clipped anyway.
 	if score > 0 && score < scoreExactFullMatch {
 		score += hubBoost(s, paired)
+		if hasTokenPrefix(queryTokens, nameTokens) {
+			score += hubBoostTokenPrefix
+		}
 	}
 	if score > scoreMaxCap {
 		score = scoreMaxCap
 	}
 
-	coord := cleanCoord(s.Latitude, s.Longitude)
-	town := townOrEmpty(s.Town, s.Name)
-
-	var stopAreaCode *string
-	if s.StopAreaCode != nil && *s.StopAreaCode != "" {
-		v := *s.StopAreaCode
-		stopAreaCode = &v
-	}
-
 	return SearchResultStop{
 		TPCCode:      s.TPCCode,
 		Name:         s.Name,
-		Town:         town,
-		Coord:        coord,
-		StopAreaCode: stopAreaCode,
+		Town:         townOrEmpty(s.Town, s.Name),
+		Coord:        cleanCoord(s.Latitude, s.Longitude),
+		StopAreaCode: optionalStringPtr(s.StopAreaCode),
 		PairedWith:   paired,
 		Score:        score,
 	}
+}
+
+// baseTierScore assigns the coarse tier before hub boosts are applied.
+func baseTierScore(lowerName, lowerQuery string, queryTokens, nameTokens []string) int {
+	switch {
+	case lowerName == lowerQuery:
+		return scoreExactFullMatch
+	case allTokensAtWordBoundary(queryTokens, nameTokens):
+		return scoreAllTokensWordBoundary
+	case allTokensAsSubstrings(queryTokens, lowerName):
+		return scoreAllTokensSubstring
+	case anyTokenAsSubstring(queryTokens, lowerName):
+		return scoreSomeTokensMatch
+	}
+	return 0
+}
+
+func optionalStringPtr(p *string) *string {
+	if p == nil || *p == "" {
+		return nil
+	}
+	v := *p
+	return &v
 }
 
 // hubBoost returns a scaled bonus rewarding true interchanges. Paired stops,
@@ -141,6 +151,22 @@ func hubBoost(s db.Stop, paired []string) int {
 		boost += hubBoostCanonicalName
 	}
 	return boost
+}
+
+// hasTokenPrefix reports whether the stop-name's leading tokens exactly match
+// the query's tokens in order. It distinguishes "starts with the query" from
+// "contains the query anywhere", so a query like "Schiphol" prefers
+// "Schiphol, Airport" over "Knooppunt Schiphol Nrd".
+func hasTokenPrefix(queryTokens, nameTokens []string) bool {
+	if len(queryTokens) == 0 || len(nameTokens) < len(queryTokens) {
+		return false
+	}
+	for i, q := range queryTokens {
+		if nameTokens[i] != q {
+			return false
+		}
+	}
+	return true
 }
 
 func isCanonicalHubName(name string) bool {
