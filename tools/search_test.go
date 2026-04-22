@@ -19,6 +19,11 @@ type mockStopSearcher struct {
 	pairs       map[string][]string
 	pairsErr    error
 	lastPairReq []string
+
+	bboxResults []db.Stop
+	bboxErr     error
+	lastBBox    [4]float64
+	lastBBoxLim int
 }
 
 func (m *mockStopSearcher) SearchStops(_ context.Context, query string, limit int) ([]db.Stop, error) {
@@ -33,6 +38,12 @@ func (m *mockStopSearcher) PairedStopsByCode(_ context.Context, codes []string) 
 		return map[string][]string{}, m.pairsErr
 	}
 	return m.pairs, m.pairsErr
+}
+
+func (m *mockStopSearcher) StopsInBBox(_ context.Context, minLat, maxLat, minLng, maxLng float64, limit int) ([]db.Stop, error) {
+	m.lastBBox = [4]float64{minLat, maxLat, minLng, maxLng}
+	m.lastBBoxLim = limit
+	return m.bboxResults, m.bboxErr
 }
 
 func TestSearchStopsTool(t *testing.T) {
@@ -68,8 +79,10 @@ func TestSearchStopsTool(t *testing.T) {
 	if mock.lastQ != "Centraal" {
 		t.Errorf("expected query 'Centraal', got %q", mock.lastQ)
 	}
-	if mock.lastLim != 10 {
-		t.Errorf("expected default limit 10, got %d", mock.lastLim)
+	// The tool over-fetches candidates before re-ranking, so the DB sees
+	// default limit (10) * fanout.
+	if want := 10 * searchCandidateFanout; mock.lastLim != want {
+		t.Errorf("expected DB limit %d, got %d", want, mock.lastLim)
 	}
 }
 
@@ -107,8 +120,8 @@ func TestSearchStopsTool_LimitClamping(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if mock.lastLim != 50 {
-		t.Errorf("expected clamped limit 50, got %d", mock.lastLim)
+	if want := 50 * searchCandidateFanout; mock.lastLim != want {
+		t.Errorf("expected DB limit %d (clamped 50 * fanout), got %d", want, mock.lastLim)
 	}
 }
 

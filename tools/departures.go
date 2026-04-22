@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -16,7 +17,13 @@ import (
 
 func DeparturesTool(client ovapiclient.HTTPDoer, searcher StopSearcher) (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("get_departures",
-		mcp.WithDescription("Get real-time departures for a Dutch public transport stop. Accepts either a fuzzy stop name or one or more TPC codes. Returns a lean shape by default; set verbose=true for the raw upstream response."),
+		mcp.WithDescription(
+			"Get real-time departures for a Dutch public transport stop. Accepts either a fuzzy stop name or one or more TPC codes. "+
+				"Returns a lean shape by default; set verbose=true for the raw upstream response (filters are still applied to verbose).\n\n"+
+				"Coverage: KV78turbo bus/tram/metro/ferry only. NS trains are not included.\n\n"+
+				"Per-departure 'status' vocabulary from the BISON feed: PLANNED, DRIVING, ARRIVED, PASSED, OFFROUTE, CANCEL. "+
+				"'display' gives a human-friendly countdown ('Nu', 'N min', or 'HH:MM').",
+		),
 		mcp.WithString("stop_name", mcp.Description("Fuzzy stop name (e.g. 'Amsterdam Centraal'). One of stop_name or tpc_code is required.")),
 		mcp.WithString("tpc_code", mcp.Description("Timing point code, or comma-separated list of codes (e.g. '30006018' or '30006018,30006014'). Skips fuzzy search.")),
 		mcp.WithNumber("limit", mcp.Description("When using stop_name: maximum number of matching stops to fetch departures for (default 3, max 10). Ignored when tpc_code is provided.")),
@@ -24,13 +31,18 @@ func DeparturesTool(client ovapiclient.HTTPDoer, searcher StopSearcher) (mcp.Too
 		mcp.WithString("direction", mcp.Description("Filter departures whose destination name contains this substring (case-insensitive).")),
 		mcp.WithNumber("time_window_minutes", mcp.Description("Only return departures planned within the next N minutes.")),
 		mcp.WithNumber("max_departures", mcp.Description("Maximum number of departures per stop after filtering.")),
-		mcp.WithBoolean("verbose", mcp.Description("If true, return the raw upstream response instead of the lean shape. Default false.")),
+		mcp.WithBoolean("include_paired", mcp.Description("When using tpc_code: auto-expand the query to include paired TPCs (opposite-direction platforms etc). Default false.")),
+		mcp.WithBoolean("drop_empty", mcp.Description("Omit stops whose departures list is empty after filtering. Default false.")),
+		mcp.WithBoolean("verbose", mcp.Description("If true, return the raw upstream response instead of the lean shape. Filters still apply. Default false.")),
 	)
 
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		codes, errResult := resolveCodes(ctx, request, searcher)
 		if errResult != nil {
 			return errResult, nil
+		}
+		if request.GetBool("include_paired", false) {
+			codes = expandPaired(ctx, searcher, codes)
 		}
 
 		u := ovapiclient.BuildURL(ovapiBase, "tpc", strings.Join(codes, ","))
@@ -39,8 +51,20 @@ func DeparturesTool(client ovapiclient.HTTPDoer, searcher StopSearcher) (mcp.Too
 			return errResult, nil
 		}
 
+		filters := departureFilters{
+			line:              request.GetString("line", ""),
+			direction:         request.GetString("direction", ""),
+			timeWindowMinutes: int(request.GetInt("time_window_minutes", 0)),
+			maxDepartures:     int(request.GetInt("max_departures", 0)),
+		}
+		dropEmpty := request.GetBool("drop_empty", false)
+
 		if request.GetBool("verbose", false) {
-			return mcp.NewToolResultText(string(body)), nil
+			filtered, err := filterVerboseTPC(body, filters)
+			if err != nil {
+				return mcp.NewToolResultError("failed to filter upstream response: " + err.Error()), nil
+			}
+			return mcp.NewToolResultText(string(filtered)), nil
 		}
 
 		var raw rawTPCResponse
@@ -48,14 +72,11 @@ func DeparturesTool(client ovapiclient.HTTPDoer, searcher StopSearcher) (mcp.Too
 			return mcp.NewToolResultError("failed to parse upstream response: " + err.Error()), nil
 		}
 
-		filters := departureFilters{
-			line:              request.GetString("line", ""),
-			direction:         request.GetString("direction", ""),
-			timeWindowMinutes: int(request.GetInt("time_window_minutes", 0)),
-			maxDepartures:     int(request.GetInt("max_departures", 0)),
-		}
-
 		lean := transformTPC(raw, filters)
+		if dropEmpty {
+			lean.Stops = dropEmptyStops(lean.Stops)
+		}
+		sortStopsByCode(lean.Stops)
 		if err := annotateLeanPairs(ctx, searcher, lean.Stops); err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
@@ -115,6 +136,49 @@ func clampLimit(v, def, lo, hi int) int {
 		return def
 	}
 	return v
+}
+
+// expandPaired adds the paired TPCs (same physical stop, opposite direction)
+// to the request code set. Unknown codes or missing pairings are tolerated —
+// expansion is best-effort.
+func expandPaired(ctx context.Context, searcher StopSearcher, codes []string) []string {
+	if searcher == nil || len(codes) == 0 {
+		return codes
+	}
+	pairs, err := searcher.PairedStopsByCode(ctx, codes)
+	if err != nil {
+		return codes
+	}
+	seen := make(map[string]bool, len(codes))
+	for _, c := range codes {
+		seen[c] = true
+	}
+	out := append([]string{}, codes...)
+	for _, c := range codes {
+		for _, p := range pairs[c] {
+			if !seen[p] {
+				seen[p] = true
+				out = append(out, p)
+			}
+		}
+	}
+	return out
+}
+
+func dropEmptyStops(stops []LeanStop) []LeanStop {
+	kept := stops[:0]
+	for _, s := range stops {
+		if len(s.Departures) > 0 {
+			kept = append(kept, s)
+		}
+	}
+	return kept
+}
+
+// sortStopsByCode pins a deterministic order; upstream's map iteration
+// would otherwise shuffle stops between identical requests.
+func sortStopsByCode(stops []LeanStop) {
+	sort.Slice(stops, func(i, j int) bool { return stops[i].TPCCode < stops[j].TPCCode })
 }
 
 // annotateLeanPairs populates PairedWith on each lean stop. When the searcher is

@@ -42,6 +42,34 @@ func (s *PgStopSearcher) SearchStops(ctx context.Context, query string, limit in
 	return stops, rows.Err()
 }
 
+// StopsInBBox returns stops whose coordinates fall inside the given
+// axis-aligned bounding box. The caller is expected to compute Haversine
+// distance from a reference point and sort themselves, since a bounding
+// box doesn't give us a centroid to rank by.
+func (s *PgStopSearcher) StopsInBBox(ctx context.Context, minLat, maxLat, minLng, maxLng float64, limit int) ([]Stop, error) {
+	rows, err := s.DB.QueryContext(ctx,
+		`SELECT tpc_code, name, town, latitude, longitude, stop_area_code
+		FROM stops
+		WHERE latitude BETWEEN $1 AND $2
+		  AND longitude BETWEEN $3 AND $4
+		LIMIT $5`,
+		minLat, maxLat, minLng, maxLng, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var stops []Stop
+	for rows.Next() {
+		var st Stop
+		if err := rows.Scan(&st.TPCCode, &st.Name, &st.Town, &st.Latitude, &st.Longitude, &st.StopAreaCode); err != nil {
+			return nil, err
+		}
+		stops = append(stops, st)
+	}
+	return stops, rows.Err()
+}
+
 // PairedStopsByCode returns a map from input tpc_code to the tpc_codes of stops
 // that share the same name and sit within a small lat/lon bounding box.
 // Stops without pairs are omitted from the map.
