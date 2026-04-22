@@ -102,6 +102,14 @@ func TestToolDescription_Journey_StopsAndStopType(t *testing.T) {
 	}
 }
 
+func TestToolDescription_GetDepartures_LineServedHereDocumented(t *testing.T) {
+	tool, _ := DeparturesTool(newMockDoer("{}"), &mockStopSearcher{})
+	if !strings.Contains(tool.Description, "line_served_here") {
+		t.Errorf("get_departures description should document line_served_here\nhave: %s",
+			tool.Description)
+	}
+}
+
 func TestToolDescription_GetDepartures_StatusVocabulary(t *testing.T) {
 	tool, _ := DeparturesTool(newMockDoer("{}"), &mockStopSearcher{})
 	// Spec asks for at minimum PLANNED, DRIVING, ARRIVED, PASSED, CANCEL.

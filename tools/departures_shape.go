@@ -55,6 +55,14 @@ type LeanStop struct {
 	PairedWith []string        `json:"paired_with,omitempty"`
 	Departures []LeanDeparture `json:"departures"`
 	Messages   []string        `json:"messages"`
+	// LineServedHere is populated only when the caller passes a 'line' filter.
+	// It disambiguates the empty-departures case: true means the filtered line
+	// appears in the upstream response for this stop (the stop is served, the
+	// list is just empty because of time_window or other filters), false means
+	// no pass for that line is present in the current window (the line may
+	// never stop here, or simply has no scheduled passes nearby — we cannot
+	// distinguish those two without a static-timetable lookup).
+	LineServedHere *bool `json:"line_served_here,omitempty"`
 }
 
 type LeanDeparture struct {
@@ -115,6 +123,11 @@ func transformStop(entry rawStopEntry, filters departureFilters, now time.Time) 
 		Messages:   collectMessages(entry.GeneralMessages),
 	}
 
+	if filters.line != "" {
+		served := lineAppearsInPasses(entry.Passes, filters.line)
+		stop.LineServedHere = &served
+	}
+
 	for id, pass := range entry.Passes {
 		dep, ok := transformPass(id, pass, filters, now)
 		if !ok {
@@ -129,6 +142,18 @@ func transformStop(entry rawStopEntry, filters departureFilters, now time.Time) 
 		stop.Departures = stop.Departures[:filters.maxDepartures]
 	}
 	return stop
+}
+
+// lineAppearsInPasses reports whether any of the raw upstream passes carries
+// the given LinePublicNumber (case-insensitive). Used to populate
+// LineServedHere before any other filter trims the pass set.
+func lineAppearsInPasses(passes map[string]rawPass, line string) bool {
+	for _, p := range passes {
+		if strings.EqualFold(p.LinePublicNumber, line) {
+			return true
+		}
+	}
+	return false
 }
 
 func transformPass(id string, p rawPass, filters departureFilters, now time.Time) (LeanDeparture, bool) {

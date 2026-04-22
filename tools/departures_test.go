@@ -597,6 +597,145 @@ func TestDeparturesTool_StopNameGoesThroughRanker(t *testing.T) {
 	}
 }
 
+func TestDeparturesTool_LineServedHere_TrueWhenLinePresent(t *testing.T) {
+	defer fixedTime(t)()
+
+	body := loadTestData(t, "tpc_live.json")
+	mockHTTP := newMockDoer(body)
+
+	_, handler := DeparturesTool(mockHTTP, nil)
+
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]any{
+		"tpc_code": "30006018,30006014",
+		"line":     "17",
+	}
+	result, _ := handler(context.Background(), req)
+	text := result.Content[0].(mcp.TextContent).Text
+
+	var parsed LeanResponse
+	if err := json.Unmarshal([]byte(text), &parsed); err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if len(parsed.Stops) == 0 {
+		t.Fatal("expected stops")
+	}
+	for _, s := range parsed.Stops {
+		if s.LineServedHere == nil {
+			t.Errorf("stop %s: expected line_served_here to be set when 'line' filter is passed", s.TPCCode)
+			continue
+		}
+		if !*s.LineServedHere {
+			t.Errorf("stop %s: expected line_served_here=true (fixture has line 17)", s.TPCCode)
+		}
+	}
+}
+
+func TestDeparturesTool_LineServedHere_FalseWhenLineAbsent(t *testing.T) {
+	defer fixedTime(t)()
+
+	body := loadTestData(t, "tpc_live.json")
+	mockHTTP := newMockDoer(body)
+
+	_, handler := DeparturesTool(mockHTTP, nil)
+
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]any{
+		"tpc_code": "30006018",
+		"line":     "99", // not present in fixture
+	}
+	result, _ := handler(context.Background(), req)
+	text := result.Content[0].(mcp.TextContent).Text
+
+	var parsed LeanResponse
+	if err := json.Unmarshal([]byte(text), &parsed); err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if len(parsed.Stops) == 0 {
+		t.Fatal("expected stop entry even with zero departures")
+	}
+	s := parsed.Stops[0]
+	if s.LineServedHere == nil {
+		t.Fatal("expected line_served_here to be set when 'line' filter is passed")
+	}
+	if *s.LineServedHere {
+		t.Errorf("expected line_served_here=false when no upstream pass matches")
+	}
+	if len(s.Departures) != 0 {
+		t.Errorf("expected empty departures, got %d", len(s.Departures))
+	}
+}
+
+func TestDeparturesTool_LineServedHere_OmittedWhenNoLineFilter(t *testing.T) {
+	defer fixedTime(t)()
+
+	body := loadTestData(t, "tpc_live.json")
+	mockHTTP := newMockDoer(body)
+
+	_, handler := DeparturesTool(mockHTTP, nil)
+
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]any{"tpc_code": "30006018"}
+	result, _ := handler(context.Background(), req)
+	text := result.Content[0].(mcp.TextContent).Text
+
+	if strings.Contains(text, "line_served_here") {
+		t.Errorf("expected line_served_here omitted when no line filter, got %s", text)
+	}
+
+	var parsed LeanResponse
+	_ = json.Unmarshal([]byte(text), &parsed)
+	for _, s := range parsed.Stops {
+		if s.LineServedHere != nil {
+			t.Errorf("stop %s: expected LineServedHere nil, got %v", s.TPCCode, *s.LineServedHere)
+		}
+	}
+}
+
+// When 'line' filter matches upstream passes but time_window_minutes trims
+// them away, line_served_here should still be true — the whole point of the
+// field is to disambiguate that case.
+func TestDeparturesTool_LineServedHere_TrueEvenWhenTimeWindowTrimmed(t *testing.T) {
+	loc, _ := time.LoadLocation("Europe/Amsterdam")
+	// Pin 'now' so all fixture departures sit well beyond 'now + 1 minute' —
+	// time_window_minutes=1 will trim every one, but the line is still in the
+	// upstream feed for the stop. This is the core case the field exists for.
+	now := time.Date(2026, 4, 21, 23, 0, 0, 0, loc)
+	prev := timeNow
+	timeNow = func() time.Time { return now }
+	defer func() { timeNow = prev }()
+
+	body := loadTestData(t, "tpc_live.json")
+	mockHTTP := newMockDoer(body)
+
+	_, handler := DeparturesTool(mockHTTP, nil)
+
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]any{
+		"tpc_code":            "30006018",
+		"line":                "17",
+		"time_window_minutes": float64(1),
+	}
+	result, _ := handler(context.Background(), req)
+	text := result.Content[0].(mcp.TextContent).Text
+
+	var parsed LeanResponse
+	if err := json.Unmarshal([]byte(text), &parsed); err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if len(parsed.Stops) == 0 {
+		t.Fatal("expected stop")
+	}
+	s := parsed.Stops[0]
+	if s.LineServedHere == nil || !*s.LineServedHere {
+		t.Errorf("expected line_served_here=true even when time window trimmed all departures, got %v",
+			s.LineServedHere)
+	}
+	if len(s.Departures) != 0 {
+		t.Errorf("expected zero departures after aggressive time window, got %d", len(s.Departures))
+	}
+}
+
 func TestTransformPass_DelaySeconds(t *testing.T) {
 	dep, _ := transformPass("id", rawPass{
 		LinePublicNumber:      "1",
