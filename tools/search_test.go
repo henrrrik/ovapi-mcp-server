@@ -81,7 +81,7 @@ func TestSearchStopsTool(t *testing.T) {
 	}
 	// The tool over-fetches candidates before re-ranking, so the DB sees
 	// default limit (10) * fanout.
-	if want := 10 * searchCandidateFanout; mock.lastLim != want {
+	if want := candidatePool(10); mock.lastLim != want {
 		t.Errorf("expected DB limit %d, got %d", want, mock.lastLim)
 	}
 }
@@ -120,8 +120,8 @@ func TestSearchStopsTool_LimitClamping(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if want := 50 * searchCandidateFanout; mock.lastLim != want {
-		t.Errorf("expected DB limit %d (clamped 50 * fanout), got %d", want, mock.lastLim)
+	if want := candidatePool(50); mock.lastLim != want {
+		t.Errorf("expected DB limit %d (clamped 50, then pooled), got %d", want, mock.lastLim)
 	}
 }
 

@@ -11,7 +11,7 @@ import (
 // The thresholds are close enough that a small hub boost can nudge a
 // borderline result across tiers without overwhelming the intent of the
 // query.
-// Tier ceilings leave room for a scaled hub boost (up to +100) while keeping
+// Tier ceilings leave room for a scaled hub boost (up to +130) while keeping
 // everything inside the 0-1000 band. Exact matches hit the cap outright.
 const (
 	scoreExactFullMatch        = 1000
@@ -22,15 +22,19 @@ const (
 	scoreFloor                 = 200
 	scoreMinQueryLength        = 3
 	searchCandidateFanout      = 4
+	// searchCandidateMin keeps the pool useful for tiny limits: with
+	// get_departures' default limit of 3 (and often 1) the ranker would
+	// otherwise see only 4-12 candidates.
+	searchCandidateMin = 24
 
 	// Hub boost components. Paired_with is scaled (+10/entry up to +50),
 	// stop_area_code is a flat +25, and a canonical hub name (Airport,
-	// Centraal, or *Station) adds another +25. A token-prefix bonus (+30)
-	// rewards names whose leading tokens exactly match the query — this
-	// is what lets "Schiphol" pick "Schiphol, Airport" over "Knooppunt
-	// Schiphol Nrd" even when both are token-boundary matches. An
-	// exact-match result (already at the cap) is unaffected; the maximum
-	// boost is +130, which keeps non-exact matches below the 1000 cap.
+	// Centraal, CS, or *Station) adds another +25. A token-prefix bonus
+	// (+30) rewards names whose leading tokens exactly match the query, so
+	// that among plain stops "Schiphol, Plaza" beats "Knooppunt Schiphol
+	// Nrd" even though both are token-boundary matches. An exact-match
+	// result (already at the cap) is unaffected; the maximum boost is
+	// +130, which keeps non-exact matches below the 1000 cap.
 	hubBoostPerPair       = 10
 	hubBoostPairedCap     = 50
 	hubBoostStopAreaCode  = 25
@@ -169,12 +173,27 @@ func hasTokenPrefix(queryTokens, nameTokens []string) bool {
 	return true
 }
 
+// candidatePool is how many DB candidates the ranker scores for a given
+// result limit.
+func candidatePool(limit int) int {
+	if n := limit * searchCandidateFanout; n > searchCandidateMin {
+		return n
+	}
+	return searchCandidateMin
+}
+
+// isCanonicalHubName recognises the names Dutch interchanges carry:
+// "Airport", "Centraal", the "CS" shorthand as its own token, or a name
+// ending in "Station".
 func isCanonicalHubName(name string) bool {
 	lower := strings.ToLower(name)
 	if strings.Contains(lower, "airport") {
 		return true
 	}
 	if strings.Contains(lower, "centraal") {
+		return true
+	}
+	if containsString(tokenize(name), "cs") {
 		return true
 	}
 	return strings.HasSuffix(lower, "station")
@@ -203,23 +222,17 @@ var hubAliases = map[string][]string{
 	"station":  {"cs"},
 }
 
+// expandHubAliases appends each token's aliases after the original tokens,
+// in token order and then hubAliases slice order. The order matters:
+// hasTokenPrefix indexes nameTokens positionally, and iterating a map here
+// made the +30 prefix bonus land at random between identical requests.
 func expandHubAliases(tokens []string) []string {
-	seen := make(map[string]bool, len(tokens)*2)
-	for _, t := range tokens {
-		seen[t] = true
-	}
+	out := append(make([]string, 0, len(tokens)*2), tokens...)
 	for _, t := range tokens {
 		for _, alias := range hubAliases[t] {
-			seen[alias] = true
-		}
-	}
-	out := make([]string, 0, len(seen))
-	for _, t := range tokens {
-		out = append(out, t)
-	}
-	for alias := range seen {
-		if !containsString(tokens, alias) {
-			out = append(out, alias)
+			if !containsString(out, alias) {
+				out = append(out, alias)
+			}
 		}
 	}
 	return out

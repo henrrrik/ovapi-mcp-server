@@ -33,6 +33,8 @@ type rawLineInfo struct {
 // Actuals entry carries one stop (the vehicle's current stop) rather than the
 // full route.
 type rawLineActualPass struct {
+	DataOwnerCode         string  `json:"DataOwnerCode"`
+	OperatorCode          string  `json:"OperatorCode"`
 	TimingPointName       string  `json:"TimingPointName"`
 	TimingPointCode       string  `json:"TimingPointCode"`
 	UserStopOrderNumber   int     `json:"UserStopOrderNumber"`
@@ -137,7 +139,7 @@ func buildActiveJourneys(actuals map[string]rawLineActualPass) []LeanActiveJourn
 			expected = a.TargetDepartureTime
 		}
 		out = append(out, LeanActiveJourney{
-			JourneyID:    id,
+			JourneyID:    journeyIDForOperator(id, a.DataOwnerCode, a.OperatorCode),
 			CurrentStop:  a.TimingPointName,
 			CurrentOrder: a.UserStopOrderNumber,
 			Status:       a.TripStopStatus,

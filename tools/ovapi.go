@@ -3,7 +3,6 @@ package tools
 import (
 	"context"
 	"encoding/json"
-	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -53,7 +52,7 @@ func LinesTool(client ovapiclient.HTTPDoer) (mcp.Tool, server.ToolHandlerFunc) {
 	)
 
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		lineID := request.GetString("line_id", "")
+		lineID := stringArg(request, "line_id")
 		if lineID != "" {
 			return handleLineDetail(ctx, client, request, lineID)
 		}
@@ -97,10 +96,10 @@ func handleLinesIndex(ctx context.Context, client ovapiclient.HTTPDoer, request 
 		return mcp.NewToolResultError("failed to parse upstream response: " + err.Error()), nil
 	}
 	filters := linesIndexFilters{
-		modes:        normalizeModeFilters(splitCSV(request.GetString("mode", ""))),
-		owners:       splitCSV(request.GetString("owner", "")),
-		nameContains: strings.TrimSpace(request.GetString("name_contains", "")),
-		publicNumber: strings.TrimSpace(request.GetString("public_number", "")),
+		modes:        normalizeModeFilters(splitCSV(stringArg(request, "mode"))),
+		owners:       splitCSV(stringArg(request, "owner")),
+		nameContains: stringArg(request, "name_contains"),
+		publicNumber: stringArg(request, "public_number"),
 		limit:        int(request.GetInt("limit", 0)),
 	}
 	resp := transformLinesIndex(raw, filters)
@@ -134,15 +133,15 @@ func JourneyTool(client ovapiclient.HTTPDoer) (mcp.Tool, server.ToolHandlerFunc)
 				"  - platform, wheelchair_accessible, number_of_coaches — same realtime-"+
 				"dependent caveats as get_departures (commonly empty for PLANNED stops)\n\n"+
 				"Journey IDs encode the service date (e.g. 'GVB_20260422_17_19206_0' is "+
-				"2026-04-22): they are only valid within that operating day. Stale IDs "+
-				"return an empty stops list rather than an error.",
+				"2026-04-22): they are only valid within that operating day. A stale or "+
+				"unknown ID is an upstream HTTP 404, returned as a tool error.",
 		),
-		mcp.WithString("journey_id", mcp.Required(), mcp.Description("Journey identifier in the format '{owner}_{YYYYMMDD}_{line}_{vehicle}_{direction}', e.g. 'GVB_20260422_17_19206_0'. Get journey IDs from get_departures (journey_id on each departure) or lines (active_journeys[].journey_id).")),
+		mcp.WithString("journey_id", mcp.Required(), mcp.Description("Journey identifier, e.g. 'GVB_20260422_17_19206_0'. Copy it verbatim from get_departures (journey_id on each departure) or lines (active_journeys[].journey_id); do not construct one. The segments are '{operator}_{YYYYMMDD}_{line_planning_number}_{journey_number}_0' — the planning number is not always the public number, and the upstream data-owner prefix (often 'NL') is already replaced with the operator code these IDs need.")),
 		mcp.WithBoolean("verbose", mcp.Description("If true, return the raw upstream response instead of the lean shape. Default false.")),
 	)
 
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		id := request.GetString("journey_id", "")
+		id := stringArg(request, "journey_id")
 		if id == "" {
 			return mcp.NewToolResultError("journey_id is required"), nil
 		}
