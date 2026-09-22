@@ -106,7 +106,7 @@ func TestShutdown_CompletesPromptlyWithSSEClientConnected(t *testing.T) {
 // stream survive restarts and multiple replicas.
 func TestStreamableHTTP_InitializeAtMCPEndpoint(t *testing.T) {
 	base, shutdown := startTestServer(t)
-	defer shutdown(context.Background())
+	defer func() { _ = shutdown(context.Background()) }()
 
 	resp := postInitialize(t, base+"/mcp")
 	if resp.StatusCode != http.StatusOK {
@@ -122,7 +122,7 @@ func TestStreamableHTTP_InitializeAtMCPEndpoint(t *testing.T) {
 // "needs sign-in".
 func TestStreamableHTTP_TrailingSlashAccepted(t *testing.T) {
 	base, shutdown := startTestServer(t)
-	defer shutdown(context.Background())
+	defer func() { _ = shutdown(context.Background()) }()
 	resp := postInitialize(t, base+"/mcp/")
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
@@ -133,7 +133,7 @@ func TestStreamableHTTP_TrailingSlashAccepted(t *testing.T) {
 // Some clients probe the endpoint with HEAD before connecting.
 func TestStreamableHTTP_HeadIsOK(t *testing.T) {
 	base, shutdown := startTestServer(t)
-	defer shutdown(context.Background())
+	defer func() { _ = shutdown(context.Background()) }()
 	resp, err := http.Head(base + "/mcp")
 	if err != nil {
 		t.Fatal(err)
@@ -152,7 +152,7 @@ func TestStreamableHTTP_HeadIsOK(t *testing.T) {
 // Streamable HTTP client and is served as one.
 func TestStreamableHTTP_PostToSSEPathIsServed(t *testing.T) {
 	base, shutdown := startTestServer(t)
-	defer shutdown(context.Background())
+	defer func() { _ = shutdown(context.Background()) }()
 	for _, path := range []string{"/sse", "/sse/"} {
 		resp := postInitialize(t, base+path)
 		if resp.StatusCode != http.StatusOK {
@@ -169,7 +169,7 @@ func TestStreamableHTTP_PostToSSEPathIsServed(t *testing.T) {
 // GET /sse must remain the SSE transport.
 func TestSSE_GetStillOpensStream(t *testing.T) {
 	base, shutdown := startTestServer(t)
-	defer shutdown(context.Background())
+	defer func() { _ = shutdown(context.Background()) }()
 	resp, err := http.Get(base + "/sse")
 	if err != nil {
 		t.Fatal(err)
@@ -182,7 +182,7 @@ func TestSSE_GetStillOpensStream(t *testing.T) {
 
 func TestRootEndpoint_AdvertisesBothTransports(t *testing.T) {
 	base, shutdown := startTestServer(t)
-	defer shutdown(context.Background())
+	defer func() { _ = shutdown(context.Background()) }()
 
 	resp, err := http.Get(base + "/")
 	if err != nil {
@@ -218,7 +218,7 @@ func TestHTTPServer_HasHeaderAndIdleTimeouts(t *testing.T) {
 // never the query string, which carries the SSE session id.
 func TestHTTPServer_AccessLog(t *testing.T) {
 	base, shutdown, logs := startTestServerWithLog(t)
-	defer shutdown(context.Background())
+	defer func() { _ = shutdown(context.Background()) }()
 
 	req, _ := http.NewRequest(http.MethodGet, base+"/does-not-exist?sessionId=secret", nil)
 	req.Header.Set("User-Agent", "probe/1.0")

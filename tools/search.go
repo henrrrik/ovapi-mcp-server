@@ -61,7 +61,7 @@ func SearchStopsTool(searcher StopSearcher) (mcp.Tool, server.ToolHandlerFunc) {
 			return mcp.NewToolResultError("query is required"), nil
 		}
 
-		limit := clampLimit(int(request.GetInt("limit", 10)), 10, 1, 50)
+		limit := clampLimit(request.GetInt("limit", 10), 10, 50)
 
 		if len([]rune(query)) < scoreMinQueryLength {
 			return writeSearchResponse(SearchResponse{Stops: []SearchResultStop{}})

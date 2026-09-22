@@ -108,7 +108,7 @@ func handleLinesIndex(ctx context.Context, client ovapiclient.HTTPDoer, request 
 		owners:       splitCSV(stringArg(request, "owner")),
 		nameContains: stringArg(request, "name_contains"),
 		publicNumber: stringArg(request, "public_number"),
-		limit:        int(request.GetInt("limit", 0)),
+		limit:        request.GetInt("limit", 0),
 	}
 	if request.GetBool("verbose", false) {
 		filtered, err := filterVerboseLinesIndex(body, filters)

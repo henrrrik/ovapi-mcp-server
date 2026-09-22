@@ -97,8 +97,8 @@ func DeparturesTool(client ovapiclient.HTTPDoer, searcher StopSearcher) (mcp.Too
 		filters := departureFilters{
 			line:              stringArg(request, "line"),
 			direction:         stringArg(request, "direction"),
-			timeWindowMinutes: int(request.GetInt("time_window_minutes", 0)),
-			maxDepartures:     int(request.GetInt("max_departures", 0)),
+			timeWindowMinutes: request.GetInt("time_window_minutes", 0),
+			maxDepartures:     request.GetInt("max_departures", 0),
 		}
 		dropEmpty := request.GetBool("drop_empty", false)
 
@@ -152,7 +152,7 @@ func resolveCodes(ctx context.Context, request mcp.CallToolRequest, searcher Sto
 	if len([]rune(name)) < scoreMinQueryLength {
 		return nil, mcp.NewToolResultError(fmt.Sprintf("stop_name must be at least %d characters", scoreMinQueryLength))
 	}
-	limit := clampLimit(int(request.GetInt("limit", 3)), 3, 1, 10)
+	limit := clampLimit(request.GetInt("limit", 3), 3, 10)
 	// Go through the full ranker (not raw pg_trgm) so hub stops win over
 	// length-similar prefix matches — e.g. "Schiphol" resolves to
 	// "Schiphol, Airport" rather than "Schipholweg".
@@ -194,11 +194,13 @@ func parseTPCCodes(raw string) ([]string, *mcp.CallToolResult) {
 	return codes, nil
 }
 
-func clampLimit(v, def, lo, hi int) int {
+// clampLimit returns v bounded to [1, hi]; a missing or non-positive value
+// yields def.
+func clampLimit(v, def, hi int) int {
 	if v > hi {
 		return hi
 	}
-	if v < lo {
+	if v < 1 {
 		return def
 	}
 	return v

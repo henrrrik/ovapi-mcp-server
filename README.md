@@ -63,7 +63,7 @@ Then ask Claude things like:
 go test -v -race ./...   # run tests (matches CI)
 gofmt -s -w .            # format
 go vet ./...             # lint
-gocyclo -over 10 .       # complexity (github.com/fzipp/gocyclo)
+golangci-lint run ./...  # config in .golangci.yml; enforced in CI
 go build ./...           # build all packages including cmd/scrape
 ```
 
