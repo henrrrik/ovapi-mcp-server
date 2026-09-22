@@ -33,17 +33,20 @@ type rawJourneyStop struct {
 	SideCode             string  `json:"SideCode"`
 	NumberOfCoaches      int     `json:"NumberOfCoaches"`
 
-	LinePublicNumber  string `json:"LinePublicNumber"`
-	LineName          string `json:"LineName"`
-	TransportType     string `json:"TransportType"`
-	DataOwnerCode     string `json:"DataOwnerCode"`
-	DestinationName50 string `json:"DestinationName50"`
-	LineDirection     int    `json:"LineDirection"`
+	LinePublicNumber   string `json:"LinePublicNumber"`
+	LinePlanningNumber string `json:"LinePlanningNumber"`
+	LineName           string `json:"LineName"`
+	TransportType      string `json:"TransportType"`
+	DataOwnerCode      string `json:"DataOwnerCode"`
+	OperatorCode       string `json:"OperatorCode"`
+	DestinationName50  string `json:"DestinationName50"`
+	LineDirection      int    `json:"LineDirection"`
 }
 
 // LeanJourney is the trimmed shape returned by journey().
 type LeanJourney struct {
 	JourneyID   string            `json:"journey_id"`
+	LineID      string            `json:"line_id,omitempty"`
 	Line        LeanLineSummary   `json:"line"`
 	Destination string            `json:"destination,omitempty"`
 	ServerTime  string            `json:"server_time,omitempty"`
@@ -108,11 +111,12 @@ func transformJourney(body []byte, journeyID string) (LeanJourney, error) {
 	})
 
 	var lineSummary LeanLineSummary
-	var destination string
+	var destination, lineID string
 	stops := make([]LeanJourneyStop, 0, len(orders))
 	for _, o := range orders {
 		s := entry.Stops[o]
 		if lineSummary.PublicNumber == "" {
+			lineID = lineIDFor(s.OperatorCode, s.DataOwnerCode, s.LinePlanningNumber, s.LineDirection)
 			lineSummary = LeanLineSummary{
 				PublicNumber: s.LinePublicNumber,
 				Name:         s.LineName,
@@ -127,9 +131,10 @@ func transformJourney(body []byte, journeyID string) (LeanJourney, error) {
 
 	return LeanJourney{
 		JourneyID:   key,
+		LineID:      lineID,
 		Line:        lineSummary,
 		Destination: destination,
-		ServerTime:  entry.ServerTime,
+		ServerTime:  normalizeUpstreamTime(entry.ServerTime),
 		Stops:       stops,
 	}, nil
 }
@@ -155,10 +160,10 @@ func leanJourneyStopFrom(s rawJourneyStop) LeanJourneyStop {
 		Coord:                cleanCoord(s.Latitude, s.Longitude),
 		IsTimingStop:         s.IsTimingStop,
 		StopType:             s.JourneyStopType,
-		TargetArrival:        s.TargetArrivalTime,
-		TargetDeparture:      s.TargetDepartureTime,
-		ExpectedArrival:      s.ExpectedArrivalTime,
-		ExpectedDeparture:    s.ExpectedDeparture,
+		TargetArrival:        normalizeUpstreamTime(s.TargetArrivalTime),
+		TargetDeparture:      normalizeUpstreamTime(s.TargetDepartureTime),
+		ExpectedArrival:      normalizeUpstreamTime(s.ExpectedArrivalTime),
+		ExpectedDeparture:    normalizeUpstreamTime(s.ExpectedDeparture),
 		Status:               s.TripStopStatus,
 		WheelchairAccessible: normalizeAccessibility(s.WheelChairAccessible),
 		Platform:             s.SideCode,

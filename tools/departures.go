@@ -22,7 +22,8 @@ func DeparturesTool(client ovapiclient.HTTPDoer, searcher StopSearcher) (mcp.Too
 				"a fuzzy stop name (resolved via the same ranker as search_stops, so "+
 				"'Schiphol' → 'Schiphol, Airport') or one or more TPC codes. Returns a lean "+
 				"shape by default; set verbose=true for the raw upstream response (filters "+
-				"still apply).\n\n"+
+				"and drop_empty still apply; line_served_here and line_id are lean shape "+
+				"only).\n\n"+
 				"Coverage: the KV78turbo feed — Dutch bus, tram, metro and ferry. Covers "+
 				"operators including GVB (Amsterdam), HTM (The Hague), RET (Rotterdam), "+
 				"Qbuzz, Connexxion (CXX), Arriva (ARR), EBS, Keolis, and regional concessions. "+
@@ -47,6 +48,10 @@ func DeparturesTool(client ovapiclient.HTTPDoer, searcher StopSearcher) (mcp.Too
 				"'display' is a human-friendly countdown and is always populated when the "+
 				"departure has a known planned or expected time: 'Nu', 'N min', 'HH:MM', or "+
 				"'Net vertrokken' (just left).\n\n"+
+				"Each departure carries 'line_id' ('{operator}_{planning_number}_{direction}', "+
+				"e.g. 'GVB_17_1', 'CXX_M300_1'), which the lines tool resolves for the route "+
+				"and active vehicles, and 'journey_id' for the journey tool. Use these ids "+
+				"as given; the lines index's own ids do not resolve upstream.\n\n"+
 				"Filter semantics — 'line' matches LinePublicNumber exactly (case-insensitive). "+
 				"'direction' is a case-insensitive substring match against the destination "+
 				"name (e.g. 'centraal' matches 'Amsterdam Centraal'). Filter order: "+
@@ -54,7 +59,7 @@ func DeparturesTool(client ovapiclient.HTTPDoer, searcher StopSearcher) (mcp.Too
 				"'max_departures' caps the per-stop count after departures are sorted by "+
 				"planned time.\n\n"+
 				"When a 'line' filter is passed, each stop carries a 'line_served_here' "+
-				"bool — true when the filtered line appears in the upstream response for "+
+				"bool (lean shape only) — true when the filtered line appears in the upstream response for "+
 				"that stop (so an empty departures list means other filters trimmed it, "+
 				"not that the line skips the stop), false when no pass for that line is "+
 				"in the current window. Omitted when no 'line' filter is set. A false "+
@@ -69,9 +74,9 @@ func DeparturesTool(client ovapiclient.HTTPDoer, searcher StopSearcher) (mcp.Too
 		mcp.WithString("direction", mcp.Description("Filter departures whose destination name contains this substring (case-insensitive). E.g. 'centraal' matches destinations like 'Amsterdam Centraal'.")),
 		mcp.WithNumber("time_window_minutes", mcp.Description("Only return departures planned within the next N minutes. Applied before max_departures.")),
 		mcp.WithNumber("max_departures", mcp.Description("Maximum number of departures per stop after time_window_minutes, direction, and line filters are applied and departures sorted by planned time.")),
-		mcp.WithBoolean("include_paired", mcp.Description("When using tpc_code: auto-expand the query to include paired TPCs (opposite-direction platforms etc). Default false.")),
-		mcp.WithBoolean("drop_empty", mcp.Description("Omit stops whose departures list is empty after filtering. Default false.")),
-		mcp.WithBoolean("verbose", mcp.Description("If true, return the raw upstream OVapi response instead of the lean shape — useful for debugging field mapping or pulling upstream fields not surfaced in the lean shape. Filters still apply. Default false.")),
+		mcp.WithBoolean("include_paired", mcp.Description("With tpc_code: auto-expand the query to include paired TPCs (opposite-direction platforms etc). Ignored with stop_name, whose ranked results already include same-named platforms and are bounded by 'limit'. Default false.")),
+		mcp.WithBoolean("drop_empty", mcp.Description("Omit stops whose departures list is empty after filtering. Note that with a 'line' filter this removes exactly the stops whose line_served_here value would explain the empty list. Default false.")),
+		mcp.WithBoolean("verbose", mcp.Description("If true, return the raw upstream OVapi response instead of the lean shape — useful for debugging field mapping or pulling upstream fields not surfaced in the lean shape. Filters and drop_empty still apply; line_served_here, line_id and journey_id normalisation are lean-only. Default false.")),
 	)
 
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -79,7 +84,7 @@ func DeparturesTool(client ovapiclient.HTTPDoer, searcher StopSearcher) (mcp.Too
 		if errResult != nil {
 			return errResult, nil
 		}
-		if request.GetBool("include_paired", false) {
+		if wantsPairedExpansion(request) {
 			codes = expandPaired(ctx, searcher, codes)
 		}
 
@@ -98,7 +103,7 @@ func DeparturesTool(client ovapiclient.HTTPDoer, searcher StopSearcher) (mcp.Too
 		dropEmpty := request.GetBool("drop_empty", false)
 
 		if request.GetBool("verbose", false) {
-			filtered, err := filterVerboseTPC(body, filters)
+			filtered, err := filterVerboseTPC(body, filters, dropEmpty)
 			if err != nil {
 				return mcp.NewToolResultError("failed to filter upstream response: " + err.Error()), nil
 			}
@@ -127,6 +132,13 @@ func DeparturesTool(client ovapiclient.HTTPDoer, searcher StopSearcher) (mcp.Too
 	}
 
 	return tool, handler
+}
+
+// wantsPairedExpansion is true only for explicit tpc_code requests with
+// include_paired: the ranked stop_name results already hold same-named
+// platforms and are bounded by 'limit'.
+func wantsPairedExpansion(request mcp.CallToolRequest) bool {
+	return stringArg(request, "tpc_code") != "" && request.GetBool("include_paired", false)
 }
 
 func resolveCodes(ctx context.Context, request mcp.CallToolRequest, searcher StopSearcher) ([]string, *mcp.CallToolResult) {

@@ -53,7 +53,7 @@ type linesIndexFilters struct {
 	// strings, parsed into these slices). An empty slice means "any".
 	modes        []string // normalized lowercase; "ferry" is mapped to upstream "boat"
 	owners       []string // compared case-insensitively
-	nameContains string   // compared case-insensitively; matches LineName or LinePublicNumber or id
+	nameContains string   // compared case-insensitively; matches LineName or LinePublicNumber
 	publicNumber string   // exact case-insensitive match on LinePublicNumber
 	limit        int      // 0 means DefaultLinesIndexLimit
 }
@@ -107,7 +107,7 @@ func splitCSV(s string) []string {
 func transformLinesIndex(raw rawLinesIndex, f linesIndexFilters) LeanLinesIndexResponse {
 	all := make([]LeanLineIndexEntry, 0, len(raw))
 	for id, e := range raw {
-		if !matchesLineFilter(id, e, f) {
+		if !matchesLineFilter(e, f) {
 			continue
 		}
 		all = append(all, LeanLineIndexEntry{
@@ -128,7 +128,13 @@ func transformLinesIndex(raw rawLinesIndex, f linesIndexFilters) LeanLinesIndexR
 		if a.PublicNumber != b.PublicNumber {
 			return comparePublicNumber(a.PublicNumber, b.PublicNumber)
 		}
-		return a.Direction < b.Direction
+		if a.Direction != b.Direction {
+			return a.Direction < b.Direction
+		}
+		// Many planning numbers share one public number; without a total
+		// order the index shuffled (and, under a limit, changed membership)
+		// between identical calls.
+		return a.ID < b.ID
 	})
 
 	limit := f.limit
@@ -152,7 +158,7 @@ func transformLinesIndex(raw rawLinesIndex, f linesIndexFilters) LeanLinesIndexR
 	return resp
 }
 
-func matchesLineFilter(id string, e rawLineIndexEntry, f linesIndexFilters) bool {
+func matchesLineFilter(e rawLineIndexEntry, f linesIndexFilters) bool {
 	if len(f.modes) > 0 && !containsString(f.modes, strings.ToLower(e.TransportType)) {
 		return false
 	}
@@ -162,17 +168,18 @@ func matchesLineFilter(id string, e rawLineIndexEntry, f linesIndexFilters) bool
 	if f.publicNumber != "" && !strings.EqualFold(f.publicNumber, e.LinePublicNumber) {
 		return false
 	}
-	return matchesNameContains(id, e, f.nameContains)
+	return matchesNameContains(e, f.nameContains)
 }
 
-func matchesNameContains(id string, e rawLineIndexEntry, needle string) bool {
+// matchesNameContains deliberately ignores the map key: matching the id
+// made "1" hit every "_1" direction suffix and "gvb" match by owner prefix.
+func matchesNameContains(e rawLineIndexEntry, needle string) bool {
 	if needle == "" {
 		return true
 	}
 	n := strings.ToLower(needle)
 	return strings.Contains(strings.ToLower(e.LineName), n) ||
-		strings.Contains(strings.ToLower(e.LinePublicNumber), n) ||
-		strings.Contains(strings.ToLower(id), n)
+		strings.Contains(strings.ToLower(e.LinePublicNumber), n)
 }
 
 func containsString(haystack []string, needle string) bool {

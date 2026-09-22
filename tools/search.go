@@ -71,6 +71,9 @@ func SearchStopsTool(searcher StopSearcher) (mcp.Tool, server.ToolHandlerFunc) {
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
+		if ranked == nil {
+			ranked = []SearchResultStop{}
+		}
 		return writeSearchResponse(SearchResponse{Stops: ranked})
 	}
 

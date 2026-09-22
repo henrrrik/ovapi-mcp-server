@@ -15,11 +15,12 @@ type verboseStopEntry struct {
 	GeneralMessages json.RawMessage            `json:"GeneralMessages"`
 }
 
-// filterVerboseTPC applies the same departure filters to a raw upstream body
-// as the lean transform does, but preserves the upstream field names so
-// verbose callers still see raw BISON fields like JourneyPatternCode.
-func filterVerboseTPC(body []byte, filters departureFilters) ([]byte, error) {
-	if !anyFilterSet(filters) {
+// filterVerboseTPC applies the same departure filters (and drop_empty) to a
+// raw upstream body as the lean transform does, but preserves the upstream
+// field names so verbose callers still see raw BISON fields like
+// JourneyPatternCode.
+func filterVerboseTPC(body []byte, filters departureFilters, dropEmpty bool) ([]byte, error) {
+	if !anyFilterSet(filters) && !dropEmpty {
 		return body, nil
 	}
 
@@ -31,6 +32,10 @@ func filterVerboseTPC(body []byte, filters departureFilters) ([]byte, error) {
 	now := timeNow().In(amsterdamLoc)
 	for code, entry := range parsed {
 		entry.Passes = filterPassMap(entry.Passes, filters, now)
+		if dropEmpty && len(entry.Passes) == 0 {
+			delete(parsed, code)
+			continue
+		}
 		parsed[code] = entry
 	}
 	return json.Marshal(parsed)
@@ -60,8 +65,11 @@ func filterPassMap(passes map[string]json.RawMessage, f departureFilters, now ti
 	}
 
 	if f.maxDepartures > 0 && len(kept) > f.maxDepartures {
-		sort.SliceStable(kept, func(i, j int) bool {
-			return kept[i].planned.Before(kept[j].planned)
+		sort.Slice(kept, func(i, j int) bool {
+			if !kept[i].planned.Equal(kept[j].planned) {
+				return kept[i].planned.Before(kept[j].planned)
+			}
+			return kept[i].id < kept[j].id
 		})
 		kept = kept[:f.maxDepartures]
 	}

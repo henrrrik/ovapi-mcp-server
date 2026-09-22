@@ -35,7 +35,7 @@ func TestToolDescription_LinesLineID_ExampleAndFormat(t *testing.T) {
 		t.Fatalf("marshal schema: %v", err)
 	}
 	desc := findToolParameterDescription(t, raw, "line_id")
-	for _, want := range []string{"GVB_17_1", "{owner}_{public_number}_{direction}"} {
+	for _, want := range []string{"GVB_17_1", "get_departures"} {
 		if !strings.Contains(desc, want) {
 			t.Errorf("line_id description missing %q\nhave: %s", want, desc)
 		}
