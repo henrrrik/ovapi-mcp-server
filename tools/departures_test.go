@@ -53,8 +53,8 @@ func TestDeparturesTool_LegacyFixtureRoundTrips(t *testing.T) {
 		t.Errorf("expected search query 'Centraal Station', got %q", mockSearch.lastQ)
 	}
 	// get_departures now over-fetches and re-ranks the same way search_stops
-	// does, so the DB sees default limit (3) * fanout.
-	if want := 3 * searchCandidateFanout; mockSearch.lastLim != want {
+	// does, so the DB sees the candidate pool for the default limit (3).
+	if want := candidatePool(3); mockSearch.lastLim != want {
 		t.Errorf("expected DB limit %d, got %d", want, mockSearch.lastLim)
 	}
 	url := mockHTTP.lastReq.URL.String()
@@ -147,7 +147,7 @@ func TestDeparturesTool_LimitClamping(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if want := 10 * searchCandidateFanout; mockSearch.lastLim != want {
+	if want := candidatePool(10); mockSearch.lastLim != want {
 		t.Errorf("expected DB limit %d (clamped 10 * fanout), got %d", want, mockSearch.lastLim)
 	}
 }

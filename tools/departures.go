@@ -62,7 +62,7 @@ func DeparturesTool(client ovapiclient.HTTPDoer, searcher StopSearcher) (mcp.Too
 				"serves it but has no passes in the current upstream window' — use the "+
 				"lines tool's route[] to confirm static coverage when that matters.",
 		),
-		mcp.WithString("stop_name", mcp.Description("Fuzzy stop name (e.g. 'Amsterdam Centraal', 'Schiphol'). Resolved via the same ranked search as search_stops: hub stops with Centraal/Airport/Station names, stop_area_code, or multiple paired platforms win over prefix-sharing minor stops. One of stop_name or tpc_code is required.")),
+		mcp.WithString("stop_name", mcp.Description("Fuzzy stop name (e.g. 'Amsterdam Centraal', 'Schiphol'), minimum 3 characters. Resolved via the same ranked search as search_stops: hub stops with Centraal/Airport/Station names, stop_area_code, or multiple paired platforms win over prefix-sharing minor stops. One of stop_name or tpc_code is required.")),
 		mcp.WithString("tpc_code", mcp.Description("Timing point code, or comma-separated list of codes (e.g. '30006018' or '30006018,30006014'). Skips fuzzy search.")),
 		mcp.WithNumber("limit", mcp.Description("When using stop_name: maximum number of matching stops to fetch departures for (default 3, max 10). Ignored when tpc_code is provided.")),
 		mcp.WithString("line", mcp.Description("Filter departures to a single line by public number (e.g. '17'). Case-insensitive exact match against LinePublicNumber.")),
@@ -137,20 +137,33 @@ func resolveCodes(ctx context.Context, request mcp.CallToolRequest, searcher Sto
 	if name == "" {
 		return nil, mcp.NewToolResultError("one of stop_name or tpc_code is required")
 	}
+	if len([]rune(name)) < scoreMinQueryLength {
+		return nil, mcp.NewToolResultError(fmt.Sprintf("stop_name must be at least %d characters", scoreMinQueryLength))
+	}
 	limit := clampLimit(int(request.GetInt("limit", 3)), 3, 1, 10)
 	// Go through the full ranker (not raw pg_trgm) so hub stops win over
 	// length-similar prefix matches — e.g. "Schiphol" resolves to
 	// "Schiphol, Airport" rather than "Schipholweg".
-	ranked, err := resolveRankedStops(ctx, searcher, name, limit)
+	ranked, candidates, err := rankStops(ctx, searcher, name, limit)
 	if err != nil {
 		return nil, mcp.NewToolResultError(err.Error())
 	}
-	if len(ranked) == 0 {
-		return nil, mcp.NewToolResultError("no stops found matching '" + name + "'")
+	codes := make([]string, 0, limit)
+	for _, s := range ranked {
+		codes = append(codes, s.TPCCode)
 	}
-	codes := make([]string, len(ranked))
-	for i, s := range ranked {
-		codes[i] = s.TPCCode
+	// A misspelling ("Schipol") matches nothing at the token level, so the
+	// tiered scorer floors every candidate. Departures are still the right
+	// answer for the closest trigram matches, which is what this tool did
+	// before it was routed through the ranker; search_stops keeps the
+	// stricter behaviour since its scores would be meaningless here.
+	if len(codes) == 0 {
+		for i := 0; i < len(candidates) && i < limit; i++ {
+			codes = append(codes, candidates[i].TPCCode)
+		}
+	}
+	if len(codes) == 0 {
+		return nil, mcp.NewToolResultError("no stops found matching '" + name + "'")
 	}
 	return codes, nil
 }

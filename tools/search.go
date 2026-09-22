@@ -32,7 +32,7 @@ func SearchStopsTool(searcher StopSearcher) (mcp.Tool, server.ToolHandlerFunc) {
 				"800 when every query token appears at a word boundary of the stop name, "+
 				"650 for substring matches, 350 for partial. True interchanges/hub stops "+
 				"(stops with a stop_area_code, multiple paired platforms, or canonical "+
-				"names like 'Centraal' or '*Station', or a name that starts with the "+
+				"names like 'Centraal', 'CS' or '*Station', or a name that starts with the "+
 				"query) get a scaled additive boost that can lift them up to ~130 points "+
 				"higher — so 'Schiphol' picks 'Schiphol, Airport' rather than 'Schipholweg', "+
 				"and 'Utrecht' picks 'Utrecht Centraal' rather than 'Utrechtseweg'.\n\n"+
@@ -84,12 +84,20 @@ func SearchStopsTool(searcher StopSearcher) (mcp.Tool, server.ToolHandlerFunc) {
 // queries like "Schiphol" to the airport hub rather than a prefix-matching
 // bus stop like "Schipholweg". Queries under the minimum length return nil.
 func resolveRankedStops(ctx context.Context, searcher StopSearcher, query string, limit int) ([]SearchResultStop, error) {
+	ranked, _, err := rankStops(ctx, searcher, query, limit)
+	return ranked, err
+}
+
+// rankStops is resolveRankedStops plus the raw, similarity-ordered DB
+// candidates it scored, so a caller can fall back to them when the tiered
+// scorer drops everything (a misspelling that trigrams still match).
+func rankStops(ctx context.Context, searcher StopSearcher, query string, limit int) ([]SearchResultStop, []db.Stop, error) {
 	if len([]rune(query)) < scoreMinQueryLength {
-		return nil, nil
+		return nil, nil, nil
 	}
-	candidates, err := searcher.SearchStops(ctx, query, limit*searchCandidateFanout)
+	candidates, err := searcher.SearchStops(ctx, query, candidatePool(limit))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	codes := make([]string, len(candidates))
 	for i, s := range candidates {
@@ -97,9 +105,9 @@ func resolveRankedStops(ctx context.Context, searcher StopSearcher, query string
 	}
 	pairs, err := searcher.PairedStopsByCode(ctx, codes)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return scoreAndRank(query, candidates, pairs, limit), nil
+	return scoreAndRank(query, candidates, pairs, limit), candidates, nil
 }
 
 func writeSearchResponse(resp SearchResponse) (*mcp.CallToolResult, error) {
