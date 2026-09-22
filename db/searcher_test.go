@@ -28,7 +28,7 @@ func seededSearcher(t *testing.T, stops []Stop) *PgStopSearcher {
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
-	t.Cleanup(func() { conn.Close() })
+	t.Cleanup(func() { _ = conn.Close() })
 	ctx := context.Background()
 	if err := Migrate(ctx, conn); err != nil {
 		t.Fatalf("migrate: %v", err)

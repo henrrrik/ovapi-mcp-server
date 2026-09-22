@@ -21,7 +21,7 @@ Deployed on Runway at https://ovapi-mcp-server.pqapp.dev
 - `go test -v -race ./...` — run tests (matches CI)
 - `gofmt -s -w .` — run before committing
 - `go vet ./...` — run before committing
-- `gocyclo -over 10 .` — run before committing
+- `golangci-lint run ./...` — run before committing (CI enforces it via `.golangci.yml`; includes the gocyclo limit of 10 for non-test code)
 - `go build ./...` — build all packages including cmd/scrape
 - `OVAPI_TEST_DATABASE_URL=postgres://... go test ./db/` — Postgres integration tests for the search and pairing SQL (skipped when unset; the database is truncated and re-seeded, so point it at a throwaway one, e.g. `docker run -d -e POSTGRES_PASSWORD=pg -p 55432:5432 postgres:16`)
 

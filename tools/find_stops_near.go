@@ -99,8 +99,8 @@ func parseFindNearParams(request mcp.CallToolRequest) (findNearParams, *mcp.Call
 		return findNearParams{}, mcp.NewToolResultError("lat/lng out of range")
 	}
 
-	radius := clampLimit(int(request.GetInt("radius_m", defaultRadius)), defaultRadius, 1, maxRadius)
-	limit := clampLimit(int(request.GetInt("limit", defaultNearLimit)), defaultNearLimit, 1, maxNearLimit)
+	radius := clampLimit(request.GetInt("radius_m", defaultRadius), defaultRadius, maxRadius)
+	limit := clampLimit(request.GetInt("limit", defaultNearLimit), defaultNearLimit, maxNearLimit)
 
 	return findNearParams{lat: lat, lng: lng, radius: radius, limit: limit}, nil
 }

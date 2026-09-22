@@ -162,9 +162,10 @@ func TestSearchScore_HubBoostScalesWithPairCount(t *testing.T) {
 	}
 	var hScore, sScore int
 	for _, st := range resp.Stops {
-		if st.TPCCode == "H" {
+		switch st.TPCCode {
+		case "H":
 			hScore = st.Score
-		} else if st.TPCCode == "S" {
+		case "S":
 			sScore = st.Score
 		}
 	}
