@@ -2,6 +2,8 @@
 
 An MCP (Model Context Protocol) server that proxies the Dutch [OVapi](https://www.ovapi.nl/) public transport APIs, with fuzzy stop search powered by Postgres.
 
+Hosted on [Runway](https://www.runway.horse) at https://ovapi-mcp-server.pqapp.dev
+
 
 ## Tools
 
