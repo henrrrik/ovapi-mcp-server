@@ -1,6 +1,6 @@
 # OVapi MCP Server
 
-An MCP (Model Context Protocol) server that proxies the Dutch [OVapi](https://www.ovapi.nl/) public transport APIs, with fuzzy stop search powered by Postgres.
+An MCP (Model Context Protocol) server for Dutch public transport: it proxies the [OVapi](https://www.ovapi.nl/) feed (bus, tram, metro, ferry) with fuzzy stop search powered by Postgres, and the [NS](https://apiportal.ns.nl/) Reisinformatie API for trains.
 
 Hosted on [Runway](https://www.runway.horse) at https://ovapi-mcp-server.pqapp.dev
 
@@ -14,12 +14,16 @@ Hosted on [Runway](https://www.runway.horse) at https://ovapi-mcp-server.pqapp.d
 | `find_stops_near` | Nearest-first stops within a lat/lng radius (default 500 m, max 5 km). Haversine distance. |
 | `lines` | Compact index of all lines, or details for a specific line by `line_id` (format `{operator}_{planning_number}_{direction}`, e.g. `GVB_17_1`; take it from a departure or journey, since the index's own `NL_...` keys do not resolve). Detail includes `route[]` and `active_journeys[]` with `current_tpc_code`. Filters: `mode`, `owner`, `public_number` (exact), `name_contains`. |
 | `journey` | Lean journey shape with `line_id` and `stops[]` in travel order (`target_*` scheduled, `expected_*` realtime-adjusted, `stop_type` ∈ {FIRST, INTERMEDIATE, LAST}). |
+| `train_stations` | NS railway stations by name or code, or nearest to a lat/lng. Returns the station `code` the other `train_*` tools take, UIC code, synonyms, coordinates and station type. |
+| `train_departures` | Real-time train departures from a station (name or code): train, category, direction, planned/expected times, delay, track and track changes, cancellations, route, messages. |
+| `train_trips` | NS journey planner between two stations, optional `via`, depart-after or arrive-by. Trips carry durations, transfers, status, crowd forecast, second-class price and per-train legs. |
+| `train_disruptions` | Active disruptions and engineering works (`DISRUPTION`, `MAINTENANCE`, `CALAMITY`), optionally for one station, with situation, cause, consequence, advices and affected stations. |
 
 ### Coverage
 
-KV78turbo feed only: Dutch bus, tram, metro, ferry. Operators include GVB (Amsterdam), HTM (The Hague), RET (Rotterdam), Qbuzz, Connexxion (CXX), Arriva (ARR), EBS, Keolis, and regional concessions.
+The OVapi tools (`get_departures`, `search_stops`, `find_stops_near`, `lines`, `journey`) read the KV78turbo feed: Dutch bus, tram, metro, ferry. Operators include GVB (Amsterdam), HTM (The Hague), RET (Rotterdam), Qbuzz, Connexxion (CXX), Arriva (ARR), EBS, Keolis, and regional concessions. **Trains are not in that feed.**
 
-**NS intercity/sprinter trains are not included** — they run on their own Reisinformatie API, which this server doesn't proxy.
+The `train_*` tools read the NS Reisinformatie API instead: every train operator on the Dutch network plus foreign stations served from the Netherlands. They are registered only when `NS_API_KEY` is set (a key for the "Ns-App" product from [apiportal.ns.nl](https://apiportal.ns.nl/); the free tier is a few thousand requests a day). The station list is cached in memory for 24 hours; departures, trips and disruptions are live.
 
 ### Data freshness & nulls
 

@@ -12,6 +12,7 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 
 	"github.com/henrrrik/ovapi-mcp-server/db"
+	"github.com/henrrrik/ovapi-mcp-server/nsclient"
 	"github.com/henrrrik/ovapi-mcp-server/ovapiclient"
 	"github.com/henrrrik/ovapi-mcp-server/tools"
 )
@@ -40,7 +41,15 @@ func main() {
 		log.Println("DATABASE_URL not set, stop search disabled")
 	}
 
-	mcpServer := NewOVapiServer(client, searcher)
+	var trains *nsclient.Trains
+	if key := os.Getenv("NS_API_KEY"); key != "" {
+		trains = nsclient.NewTrains(key, nsclient.NewHTTPClient())
+		log.Println("NS_API_KEY set, train tools enabled")
+	} else {
+		log.Println("NS_API_KEY not set, train tools disabled")
+	}
+
+	mcpServer := NewOVapiServer(client, searcher, trains)
 
 	srv, shutdown := newHTTPServer(":"+port, mcpServer, log.Default())
 

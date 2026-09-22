@@ -26,7 +26,7 @@ func startTestServer(t *testing.T) (base string, shutdown func(context.Context) 
 func startTestServerWithLog(t *testing.T) (base string, shutdown func(context.Context) error, logs *bytes.Buffer) {
 	t.Helper()
 	logs = &bytes.Buffer{}
-	srv, shutdown := newHTTPServer("127.0.0.1:0", NewOVapiServer(ovapiclient.NewClient(), nil), log.New(logs, "", 0))
+	srv, shutdown := newHTTPServer("127.0.0.1:0", NewOVapiServer(ovapiclient.NewClient(), nil, nil), log.New(logs, "", 0))
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -202,7 +202,7 @@ func TestRootEndpoint_AdvertisesBothTransports(t *testing.T) {
 // slow or idle peer can't hold connections open indefinitely. WriteTimeout
 // must stay unset: SSE streams are long-lived by design.
 func TestHTTPServer_HasHeaderAndIdleTimeouts(t *testing.T) {
-	srv, _ := newHTTPServer("127.0.0.1:0", NewOVapiServer(ovapiclient.NewClient(), nil), log.New(io.Discard, "", 0))
+	srv, _ := newHTTPServer("127.0.0.1:0", NewOVapiServer(ovapiclient.NewClient(), nil, nil), log.New(io.Discard, "", 0))
 	if srv.ReadHeaderTimeout <= 0 {
 		t.Error("ReadHeaderTimeout must be set")
 	}

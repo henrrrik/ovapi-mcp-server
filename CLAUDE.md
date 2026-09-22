@@ -4,17 +4,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-OVapi MCP Server is an MCP (Model Context Protocol) server that proxies the Dutch OVapi public transport APIs, with fuzzy stop search backed by Postgres and pg_trgm.
+OVapi MCP Server is an MCP (Model Context Protocol) server for Dutch public transport: it proxies the OVapi feed (bus, tram, metro, ferry) with fuzzy stop search backed by Postgres and pg_trgm, and the NS Reisinformatie API for trains (`train_*` tools, enabled by `NS_API_KEY`).
 
 Deployed on Runway at https://ovapi-mcp-server.pqapp.dev
 
 ## Architecture
 
 - `ovapiclient/` — HTTP client abstraction (`HTTPDoer` interface, `BuildURL`)
+- `nsclient/` — NS Reisinformatie API client (`Ocp-Apim-Subscription-Key` header, RFC 7807 errors) and the in-memory station cache with name/code resolution; `Trains` bundles both for the tools
 - `tools/` — MCP tool definitions (factory functions returning `(mcp.Tool, server.ToolHandlerFunc)`)
 - `db/` — Postgres schema, upsert, and `PgStopSearcher` (implements `StopSearcher` interface)
 - `cmd/scrape/` — CLI to populate the stops database from OVapi's `/tpc/` endpoint
-- `server.go` — wires tools into MCP server; search tool is optional (nil-safe if no DATABASE_URL)
+- `server.go` — wires tools into MCP server; search tools are optional (nil-safe if no DATABASE_URL), train tools are optional (nil-safe if no NS_API_KEY)
 - `main.go` — HTTP entry point: Streamable HTTP at `/mcp` (stateless), SSE at `/sse`, access log, graceful shutdown that closes SSE streams
 
 ## Build & Test
@@ -28,6 +29,7 @@ Deployed on Runway at https://ovapi-mcp-server.pqapp.dev
 ## Environment Variables
 - `PORT` — server port (default 5000)
 - `DATABASE_URL` — Postgres connection string; if unset, search tool is disabled
+- `NS_API_KEY` — NS API subscription key (product "Ns-App" on apiportal.ns.nl); if unset, the `train_*` tools are disabled. Locally it lives in `.env.local` (git-ignored): `set -a; . ./.env.local; set +a`
 
 ## Scrape CLI
 Populates the stops table by fetching all ~38K timing point codes from OVapi:
