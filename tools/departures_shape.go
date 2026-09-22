@@ -2,6 +2,7 @@ package tools
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 )
@@ -27,6 +28,8 @@ type rawStop struct {
 type rawPass struct {
 	DataOwnerCode         string `json:"DataOwnerCode"`
 	OperatorCode          string `json:"OperatorCode"`
+	LinePlanningNumber    string `json:"LinePlanningNumber"`
+	LineDirection         int    `json:"LineDirection"`
 	LinePublicNumber      string `json:"LinePublicNumber"`
 	LineName              string `json:"LineName"`
 	DestinationName50     string `json:"DestinationName50"`
@@ -69,6 +72,7 @@ type LeanStop struct {
 
 type LeanDeparture struct {
 	Line                 string  `json:"line"`
+	LineID               string  `json:"line_id,omitempty"`
 	Mode                 string  `json:"mode"`
 	Destination          string  `json:"destination"`
 	Planned              string  `json:"planned"`
@@ -179,6 +183,7 @@ func transformPass(id string, p rawPass, filters departureFilters, now time.Time
 
 	dep := LeanDeparture{
 		Line:                 p.LinePublicNumber,
+		LineID:               lineIDFor(p.OperatorCode, p.DataOwnerCode, p.LinePlanningNumber, p.LineDirection),
 		Mode:                 strings.ToLower(p.TransportType),
 		Destination:          p.DestinationName50,
 		Planned:              formatWithOffset(planned),
@@ -249,13 +254,15 @@ func collectMessages(m map[string]rawMessage) []string {
 	return msgs
 }
 
+// sortDeparturesByPlanned orders by planned time, then journey id so equal
+// times (the input is map iteration) cannot shuffle between calls.
 func sortDeparturesByPlanned(deps []LeanDeparture) {
-	// Insertion sort — fine for typical N~20.
-	for i := 1; i < len(deps); i++ {
-		for j := i; j > 0 && deps[j-1].Planned > deps[j].Planned; j-- {
-			deps[j-1], deps[j] = deps[j], deps[j-1]
+	sort.Slice(deps, func(i, j int) bool {
+		if deps[i].Planned != deps[j].Planned {
+			return deps[i].Planned < deps[j].Planned
 		}
-	}
+		return deps[i].JourneyID < deps[j].JourneyID
+	})
 }
 
 // computeDisplay renders a human-friendly countdown against 'now'. Guarantees

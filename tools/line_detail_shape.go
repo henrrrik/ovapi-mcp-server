@@ -2,10 +2,15 @@ package tools
 
 import (
 	"encoding/json"
+	"errors"
 	"sort"
 	"strconv"
 	"strings"
 )
+
+// errLineNotFound is returned when upstream answers an empty object for a
+// line id it does not know (it does so with HTTP 200).
+var errLineNotFound = errors.New("line not found")
 
 // rawLineDetailResponse wraps /line/{id} upstream, keyed by the requested id.
 type rawLineDetailResponse map[string]rawLineDetailBody
@@ -70,11 +75,12 @@ type LeanLineDetail struct {
 }
 
 type LeanActiveJourney struct {
-	JourneyID    string `json:"journey_id"`
-	CurrentStop  string `json:"current_stop,omitempty"`
-	CurrentOrder int    `json:"current_order,omitempty"`
-	Status       string `json:"status,omitempty"`
-	Expected     string `json:"expected,omitempty"`
+	JourneyID      string `json:"journey_id"`
+	CurrentStop    string `json:"current_stop,omitempty"`
+	CurrentTPCCode string `json:"current_tpc_code,omitempty"`
+	CurrentOrder   int    `json:"current_order,omitempty"`
+	Status         string `json:"status,omitempty"`
+	Expected       string `json:"expected,omitempty"`
 }
 
 type LeanRouteStop struct {
@@ -93,6 +99,9 @@ func transformLineDetail(body []byte, lineID string) (LeanLineDetail, error) {
 	if err := json.Unmarshal(body, &raw); err != nil {
 		return LeanLineDetail{}, err
 	}
+	if len(raw) == 0 {
+		return LeanLineDetail{}, errLineNotFound
+	}
 	entry, key, ok := pickLineDetailEntry(raw, lineID)
 	out := LeanLineDetail{
 		ID:             key,
@@ -104,7 +113,7 @@ func transformLineDetail(body []byte, lineID string) (LeanLineDetail, error) {
 		return out, nil
 	}
 
-	out.ServerTime = entry.ServerTime
+	out.ServerTime = normalizeUpstreamTime(entry.ServerTime)
 	out.Line = LeanLineSummary{
 		PublicNumber: entry.Line.LinePublicNumber,
 		Name:         entry.Line.LineName,
@@ -139,11 +148,12 @@ func buildActiveJourneys(actuals map[string]rawLineActualPass) []LeanActiveJourn
 			expected = a.TargetDepartureTime
 		}
 		out = append(out, LeanActiveJourney{
-			JourneyID:    journeyIDForOperator(id, a.DataOwnerCode, a.OperatorCode),
-			CurrentStop:  a.TimingPointName,
-			CurrentOrder: a.UserStopOrderNumber,
-			Status:       a.TripStopStatus,
-			Expected:     expected,
+			JourneyID:      journeyIDForOperator(id, a.DataOwnerCode, a.OperatorCode),
+			CurrentStop:    a.TimingPointName,
+			CurrentTPCCode: a.TimingPointCode,
+			CurrentOrder:   a.UserStopOrderNumber,
+			Status:         a.TripStopStatus,
+			Expected:       normalizeUpstreamTime(expected),
 		})
 	}
 	sort.Slice(out, func(i, j int) bool {
