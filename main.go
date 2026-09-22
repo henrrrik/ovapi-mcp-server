@@ -42,21 +42,7 @@ func main() {
 
 	mcpServer := NewOVapiServer(client, searcher)
 
-	sseServer := server.NewSSEServer(mcpServer,
-		server.WithKeepAlive(true),
-	)
-
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"name":"ovapi-mcp-server","sse_endpoint":"/sse"}`))
-	})
-	mux.Handle("/", sseServer)
-
-	srv := &http.Server{
-		Addr:    ":" + port,
-		Handler: mux,
-	}
+	srv, shutdown := newHTTPServer(":"+port, mcpServer, log.Default())
 
 	go func() {
 		log.Printf("OVapi MCP server listening on :%s", port)
@@ -72,7 +58,119 @@ func main() {
 	log.Println("shutting down server")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := srv.Shutdown(ctx); err != nil {
+	if err := shutdown(ctx); err != nil {
 		log.Printf("shutdown error: %v", err)
 	}
+}
+
+// newHTTPServer wires the MCP server behind both transports and returns the
+// listener together with the shutdown func to use instead of srv.Shutdown.
+//
+// SSE at /sse (+ /message) is the original transport; it is stateful, so a
+// restart drops every session and, with more than one replica, a client's
+// GET /sse and POST /message can land on different processes. Streamable
+// HTTP at /mcp is served stateless so clients using it survive both.
+func newHTTPServer(addr string, mcpServer *server.MCPServer, logger *log.Logger) (*http.Server, func(context.Context) error) {
+	mux := http.NewServeMux()
+	srv := &http.Server{
+		Addr:    addr,
+		Handler: withAccessLog(logger, mux),
+		// A public, unauthenticated listener: bound header reads and idle
+		// keep-alives. WriteTimeout stays 0 because SSE streams are long-lived.
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       2 * time.Minute,
+	}
+
+	// WithHTTPServer lets sseServer.Shutdown close every session's stream
+	// before shutting the listener down; without it, Shutdown is a no-op
+	// and http.Server.Shutdown waits out its deadline on the open streams.
+	sseServer := server.NewSSEServer(mcpServer,
+		server.WithKeepAlive(true),
+		server.WithHTTPServer(srv),
+	)
+	streamable := server.NewStreamableHTTPServer(mcpServer,
+		server.WithStateLess(true),
+	)
+
+	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"name":"ovapi-mcp-server","sse_endpoint":"/sse","mcp_endpoint":"/mcp"}`))
+	})
+	// Tolerate a trailing slash and HEAD probes: connector UIs normalise
+	// URLs differently, and a 404 on the first request is easily misread
+	// by a client as "this server needs sign-in".
+	mcp := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodHead {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		streamable.ServeHTTP(w, r)
+	})
+	mux.Handle("/mcp", mcp)
+	mux.Handle("/mcp/", mcp)
+
+	// Clients that speak Streamable HTTP (Claude's connector client among
+	// them) POST initialize to whatever URL they were given, including the
+	// older /sse URL, where the SSE server answers 405 and the client then
+	// misreads that as "needs sign-in". An SSE-transport client never POSTs
+	// to /sse (it posts to /message), so a POST or HEAD there is served as
+	// Streamable HTTP; GET keeps opening the SSE stream.
+	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if (r.URL.Path == "/sse" || r.URL.Path == "/sse/") && r.Method != http.MethodGet {
+			mcp.ServeHTTP(w, r)
+			return
+		}
+		sseServer.ServeHTTP(w, r)
+	}))
+
+	return srv, sseServer.Shutdown
+}
+
+// withAccessLog logs one line per request: method, path, status, duration
+// and user agent. The query string is deliberately omitted because it
+// carries the SSE session id. The status recorder keeps http.Flusher so SSE
+// and Streamable HTTP streams still flush through it.
+func withAccessLog(logger *log.Logger, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		rec := &statusRecorder{ResponseWriter: w}
+		next.ServeHTTP(rec, r)
+		logger.Printf("http method=%s path=%s status=%d duration=%s ua=%q",
+			r.Method, r.URL.Path, rec.status(), time.Since(start).Round(time.Millisecond), r.UserAgent())
+	})
+}
+
+type statusRecorder struct {
+	http.ResponseWriter
+	code int
+}
+
+func (s *statusRecorder) WriteHeader(code int) {
+	if s.code == 0 {
+		s.code = code
+	}
+	s.ResponseWriter.WriteHeader(code)
+}
+
+func (s *statusRecorder) Write(b []byte) (int, error) {
+	if s.code == 0 {
+		s.code = http.StatusOK
+	}
+	return s.ResponseWriter.Write(b)
+}
+
+func (s *statusRecorder) Flush() {
+	if s.code == 0 {
+		s.code = http.StatusOK
+	}
+	if f, ok := s.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+func (s *statusRecorder) status() int {
+	if s.code == 0 {
+		return http.StatusOK
+	}
+	return s.code
 }

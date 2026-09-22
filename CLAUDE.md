@@ -15,7 +15,7 @@ Deployed on Runway at https://ovapi-mcp-server.pqapp.dev
 - `db/` — Postgres schema, upsert, and `PgStopSearcher` (implements `StopSearcher` interface)
 - `cmd/scrape/` — CLI to populate the stops database from OVapi's `/tpc/` endpoint
 - `server.go` — wires tools into MCP server; search tool is optional (nil-safe if no DATABASE_URL)
-- `main.go` — SSE transport entry point with graceful shutdown
+- `main.go` — HTTP entry point: Streamable HTTP at `/mcp` (stateless), SSE at `/sse`, access log, graceful shutdown that closes SSE streams
 
 ## Build & Test
 - `go test -v -race ./...` — run tests (matches CI)

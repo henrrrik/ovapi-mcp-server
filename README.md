@@ -30,7 +30,14 @@ KV78turbo feed only: Dutch bus, tram, metro, ferry. Operators include GVB (Amste
 - **Rate limits.** None are documented by upstream; stops and lines are effectively static, so callers can cache `search_stops` and `lines` results. `get_departures` and `journey` should be treated as live.
 - **Verbose escape hatch.** Every tool that returns a lean shape accepts `verbose: true` to pass the raw upstream body through unchanged — useful when debugging field mapping or pulling upstream fields we don't surface in the lean shape. Filters still apply in verbose mode.
 
-## Usage with Claude Desktop
+## Connecting
+
+The hosted instance serves two transports:
+
+- **Streamable HTTP** (recommended) at `https://ovapi-mcp-server.pqapp.dev/mcp` — stateless, so it survives server restarts and works behind multiple replicas.
+- **SSE** at `https://ovapi-mcp-server.pqapp.dev/sse` — for clients that only speak the older transport. Sessions live in one process and are dropped on restart. A Streamable HTTP client that was configured with this URL (it `POST`s here instead of opening the stream) is served as Streamable HTTP, so existing connectors keep working.
+
+### Claude Desktop
 
 Add to your Claude Desktop MCP config:
 
@@ -38,8 +45,8 @@ Add to your Claude Desktop MCP config:
 {
   "mcpServers": {
     "ovapi": {
-      "type": "sse",
-      "url": "https://ovapi-mcp-server.pqapp.dev/sse"
+      "type": "http",
+      "url": "https://ovapi-mcp-server.pqapp.dev/mcp"
     }
   }
 }
@@ -70,7 +77,7 @@ DATABASE_URL=postgres://... go run ./cmd/scrape
 
 - **Go** with [mcp-go](https://github.com/mark3labs/mcp-go) for the MCP server
 - **Postgres** with `pg_trgm` for fuzzy stop name search
-- **SSE transport** for MCP communication
+- **Streamable HTTP** (`/mcp`, stateless) and **SSE** (`/sse`) transports
 - Deployed on [Runway](https://www.runway.horse/)
 
 ## License
