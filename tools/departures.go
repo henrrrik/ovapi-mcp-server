@@ -90,8 +90,8 @@ func DeparturesTool(client ovapiclient.HTTPDoer, searcher StopSearcher) (mcp.Too
 		}
 
 		filters := departureFilters{
-			line:              request.GetString("line", ""),
-			direction:         request.GetString("direction", ""),
+			line:              stringArg(request, "line"),
+			direction:         stringArg(request, "direction"),
 			timeWindowMinutes: int(request.GetInt("time_window_minutes", 0)),
 			maxDepartures:     int(request.GetInt("max_departures", 0)),
 		}
@@ -130,10 +130,10 @@ func DeparturesTool(client ovapiclient.HTTPDoer, searcher StopSearcher) (mcp.Too
 }
 
 func resolveCodes(ctx context.Context, request mcp.CallToolRequest, searcher StopSearcher) ([]string, *mcp.CallToolResult) {
-	if tpc := strings.TrimSpace(request.GetString("tpc_code", "")); tpc != "" {
+	if tpc := stringArg(request, "tpc_code"); tpc != "" {
 		return parseTPCCodes(tpc)
 	}
-	name := strings.TrimSpace(request.GetString("stop_name", ""))
+	name := stringArg(request, "stop_name")
 	if name == "" {
 		return nil, mcp.NewToolResultError("one of stop_name or tpc_code is required")
 	}

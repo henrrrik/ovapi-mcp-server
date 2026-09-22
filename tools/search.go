@@ -3,7 +3,6 @@ package tools
 import (
 	"context"
 	"encoding/json"
-	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -57,7 +56,7 @@ func SearchStopsTool(searcher StopSearcher) (mcp.Tool, server.ToolHandlerFunc) {
 	)
 
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		query := strings.TrimSpace(request.GetString("query", ""))
+		query := stringArg(request, "query")
 		if query == "" {
 			return mcp.NewToolResultError("query is required"), nil
 		}

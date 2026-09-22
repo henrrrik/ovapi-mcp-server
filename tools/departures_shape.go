@@ -25,6 +25,8 @@ type rawStop struct {
 }
 
 type rawPass struct {
+	DataOwnerCode         string `json:"DataOwnerCode"`
+	OperatorCode          string `json:"OperatorCode"`
 	LinePublicNumber      string `json:"LinePublicNumber"`
 	LineName              string `json:"LineName"`
 	DestinationName50     string `json:"DestinationName50"`
@@ -145,15 +147,22 @@ func transformStop(entry rawStopEntry, filters departureFilters, now time.Time) 
 }
 
 // lineAppearsInPasses reports whether any of the raw upstream passes carries
-// the given LinePublicNumber (case-insensitive). Used to populate
-// LineServedHere before any other filter trims the pass set.
+// the given LinePublicNumber. Used to populate LineServedHere before any
+// other filter trims the pass set.
 func lineAppearsInPasses(passes map[string]rawPass, line string) bool {
 	for _, p := range passes {
-		if strings.EqualFold(p.LinePublicNumber, line) {
+		if lineMatches(p, line) {
 			return true
 		}
 	}
 	return false
+}
+
+// lineMatches is the single 'line' filter predicate: a case-insensitive
+// exact match on LinePublicNumber. Both LineServedHere and the departure
+// filter use it so the two can never disagree.
+func lineMatches(p rawPass, line string) bool {
+	return strings.EqualFold(p.LinePublicNumber, line)
 }
 
 func transformPass(id string, p rawPass, filters departureFilters, now time.Time) (LeanDeparture, bool) {
@@ -181,13 +190,13 @@ func transformPass(id string, p rawPass, filters departureFilters, now time.Time
 		Platform:             optionalString(p.SideCode),
 		WheelchairAccessible: optionalString(normalizeAccessibility(p.WheelChairAccessible)),
 		NumberOfCoaches:      optionalCoaches(p.NumberOfCoaches),
-		JourneyID:            id,
+		JourneyID:            journeyIDForOperator(id, p.DataOwnerCode, p.OperatorCode),
 	}
 	return dep, true
 }
 
 func passesFilters(p rawPass, f departureFilters, planned, now time.Time) bool {
-	if f.line != "" && !strings.EqualFold(p.LinePublicNumber, f.line) {
+	if f.line != "" && !lineMatches(p, f.line) {
 		return false
 	}
 	if f.direction != "" && !strings.Contains(
