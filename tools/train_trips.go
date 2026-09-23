@@ -19,30 +19,46 @@ type TrainTripsResponse struct {
 }
 
 type TrainTrip struct {
-	PlannedDeparture       string     `json:"planned_departure"`
-	Departure              string     `json:"departure"`
-	PlannedArrival         string     `json:"planned_arrival"`
-	Arrival                string     `json:"arrival"`
-	PlannedDurationMinutes int        `json:"planned_duration_minutes"`
-	DurationMinutes        int        `json:"duration_minutes"`
-	Transfers              int        `json:"transfers"`
-	Status                 string     `json:"status"`
-	CrowdForecast          string     `json:"crowd_forecast,omitempty"`
-	PriceEUR               float64    `json:"price_eur,omitempty"`
-	Optimal                bool       `json:"optimal"`
-	Legs                   []TrainLeg `json:"legs"`
+	PlannedDeparture       string               `json:"planned_departure"`
+	Departure              string               `json:"departure"`
+	PlannedArrival         string               `json:"planned_arrival"`
+	Arrival                string               `json:"arrival"`
+	PlannedDurationMinutes int                  `json:"planned_duration_minutes"`
+	DurationMinutes        int                  `json:"duration_minutes"`
+	Transfers              int                  `json:"transfers"`
+	Status                 string               `json:"status"`
+	CrowdForecast          string               `json:"crowd_forecast,omitempty"`
+	PriceEUR               float64              `json:"price_eur,omitempty"`
+	Optimal                bool                 `json:"optimal"`
+	Disruption             *TrainTripDisruption `json:"disruption,omitempty"`
+	Legs                   []TrainLeg           `json:"legs"`
+}
+
+// TrainTripDisruption is why a trip is not NORMAL: the upstream primary
+// message, keyed to the disruption id train_disruptions returns.
+type TrainTripDisruption struct {
+	ID      string `json:"id,omitempty"`
+	Kind    string `json:"kind"`
+	Title   string `json:"title,omitempty"`
+	Message string `json:"message,omitempty"`
+	Phase   string `json:"phase,omitempty"`
 }
 
 type TrainLeg struct {
-	Train         string       `json:"train"`
-	Category      string       `json:"category"`
-	Operator      string       `json:"operator,omitempty"`
-	Direction     string       `json:"direction,omitempty"`
-	From          TrainLegStop `json:"from"`
-	To            TrainLegStop `json:"to"`
-	Stops         int          `json:"stops"`
-	Cancelled     bool         `json:"cancelled"`
-	CrowdForecast string       `json:"crowd_forecast,omitempty"`
+	Train                string       `json:"train"`
+	Category             string       `json:"category"`
+	Operator             string       `json:"operator,omitempty"`
+	Direction            string       `json:"direction,omitempty"`
+	From                 TrainLegStop `json:"from"`
+	To                   TrainLegStop `json:"to"`
+	Stops                int          `json:"stops"`
+	Cancelled            bool         `json:"cancelled"`
+	CancelledCause       string       `json:"cancelled_cause,omitempty"`
+	Reachable            bool         `json:"reachable"`
+	AlternativeTransport bool         `json:"alternative_transport,omitempty"`
+	TransferMinutes      int          `json:"transfer_minutes,omitempty"`
+	Messages             []string     `json:"messages,omitempty"`
+	CrowdForecast        string       `json:"crowd_forecast,omitempty"`
 }
 
 type TrainLegStop struct {
@@ -68,24 +84,48 @@ type rawNSTrip struct {
 	ProductFare              struct {
 		PriceInCents int `json:"priceInCents"`
 	} `json:"productFare"`
-	Legs []rawNSLeg `json:"legs"`
+	PrimaryMessage *rawNSPrimaryMessage `json:"primaryMessage"`
+	Legs           []rawNSLeg           `json:"legs"`
+}
+
+// rawNSPrimaryMessage is the banner NS shows on a cancelled or disrupted trip.
+type rawNSPrimaryMessage struct {
+	Title   string       `json:"title"`
+	Type    string       `json:"type"`
+	Message rawNSMessage `json:"message"`
+}
+
+type rawNSMessage struct {
+	ID    string `json:"id"`
+	Head  string `json:"head"`
+	Text  string `json:"text"`
+	Type  string `json:"type"`
+	Phase string `json:"phase"`
 }
 
 type rawNSLeg struct {
-	Direction     string       `json:"direction"`
-	Cancelled     bool         `json:"cancelled"`
-	PartCancelled bool         `json:"partCancelled"`
-	Origin        rawNSLegStop `json:"origin"`
-	Destination   rawNSLegStop `json:"destination"`
-	Product       nsProduct    `json:"product"`
-	Stops         []struct {
+	Direction            string       `json:"direction"`
+	Cancelled            bool         `json:"cancelled"`
+	PartCancelled        bool         `json:"partCancelled"`
+	Reachable            *bool        `json:"reachable"`
+	AlternativeTransport bool         `json:"alternativeTransport"`
+	Origin               rawNSLegStop `json:"origin"`
+	Destination          rawNSLegStop `json:"destination"`
+	Product              nsProduct    `json:"product"`
+	Stops                []struct {
 		Passing bool `json:"passing"`
 	} `json:"stops"`
-	CrowdForecast string `json:"crowdForecast"`
+	Notes []struct {
+		Value string `json:"value"`
+		Key   string `json:"key"`
+	} `json:"notes"`
+	Messages      []rawNSMessage `json:"messages"`
+	CrowdForecast string         `json:"crowdForecast"`
 }
 
 type rawNSLegStop struct {
 	Name            string `json:"name"`
+	RawLocationName string `json:"rawLocationName"`
 	StationCode     string `json:"stationCode"`
 	PlannedDateTime string `json:"plannedDateTime"`
 	ActualDateTime  string `json:"actualDateTime"`
@@ -101,11 +141,18 @@ func TrainTripsTool(trains *nsclient.Trains) (mcp.Tool, server.ToolHandlerFunc) 
 				"itineraries (or the ones arriving before 'date_time' when "+
 				"'search_for_arrival' is set). Each trip has planned and realtime "+
 				"departure/arrival times (Europe/Amsterdam offset), 'duration_minutes', "+
-				"'transfers', 'status' (NORMAL, CANCELLED, ...), 'crowd_forecast', "+
+				"'transfers', 'status' (NORMAL, DISRUPTION, CANCELLED, ...), 'crowd_forecast', "+
 				"'price_eur' (second class, full fare, when known) and 'legs': one per "+
 				"train with 'train', 'category', 'direction', 'from'/'to' (station code, "+
 				"name, planned/actual time, track, track_changed), the number of "+
-				"intermediate 'stops' and 'cancelled'.\n\n"+
+				"intermediate 'stops', 'cancelled' (with 'cancelled_cause'), 'reachable' "+
+				"(false when a connection cannot be made), 'transfer_minutes' from the "+
+				"previous leg and any 'messages'. A trip whose status is not NORMAL has a "+
+				"'disruption' block: 'kind' (TRIP_CANCELLED or DISRUPTION), the NS "+
+				"disruption 'id' (look it up with train_disruptions), 'title' and "+
+				"'message' (a cancelled trip may carry only the title). 'optimal' is NS's "+
+				"own recommendation, passed through as is: a delayed train on a disrupted "+
+				"section can still be the best option.\n\n"+
 				"Stations take a name or code; use train_stations to look them up. Trains "+
 				"only: bus/tram/metro legs are not planned here (see get_departures).",
 		),
@@ -176,10 +223,15 @@ func transformTrainTrip(t rawNSTrip) TrainTrip {
 		CrowdForecast:          t.CrowdForecast,
 		PriceEUR:               float64(t.ProductFare.PriceInCents) / 100,
 		Optimal:                t.Optimal,
+		Disruption:             transformTripDisruption(t.PrimaryMessage),
 		Legs:                   make([]TrainLeg, 0, len(t.Legs)),
 	}
-	for _, l := range t.Legs {
-		trip.Legs = append(trip.Legs, transformTrainLeg(l))
+	for i, l := range t.Legs {
+		leg := transformTrainLeg(l)
+		if i > 0 {
+			leg.TransferMinutes = transferMinutes(trip.Legs[i-1].To.Actual, leg.From.Actual)
+		}
+		trip.Legs = append(trip.Legs, leg)
 	}
 	if n := len(trip.Legs); n > 0 {
 		trip.PlannedDeparture = trip.Legs[0].From.Planned
@@ -190,27 +242,81 @@ func transformTrainTrip(t rawNSTrip) TrainTrip {
 	return trip
 }
 
+// transformTripDisruption turns the upstream primary message into the lean
+// disruption block; nil when the trip runs as planned.
+func transformTripDisruption(m *rawNSPrimaryMessage) *TrainTripDisruption {
+	if m == nil {
+		return nil
+	}
+	return &TrainTripDisruption{
+		ID:      m.Message.ID,
+		Kind:    firstNonEmpty(m.Type, m.Message.Type),
+		Title:   m.Title,
+		Message: firstNonEmpty(m.Message.Text, m.Message.Head),
+		Phase:   m.Message.Phase,
+	}
+}
+
+// transferMinutes is the realtime gap between arriving on one leg and
+// departing on the next; 0 when either time is missing.
+func transferMinutes(arrival, departure string) int {
+	a, d := parseAmsterdamTime(arrival), parseAmsterdamTime(departure)
+	if a.IsZero() || d.IsZero() {
+		return 0
+	}
+	return int(d.Sub(a).Minutes())
+}
+
 func transformTrainLeg(l rawNSLeg) TrainLeg {
 	return TrainLeg{
-		Train:         trainLabel(l.Product),
-		Category:      l.Product.CategoryCode,
-		Operator:      l.Product.OperatorName,
-		Direction:     l.Direction,
-		From:          transformTrainLegStop(l.Origin),
-		To:            transformTrainLegStop(l.Destination),
-		Stops:         len(l.Stops),
-		Cancelled:     l.Cancelled || l.PartCancelled,
-		CrowdForecast: l.CrowdForecast,
+		Train:                trainLabel(l.Product),
+		Category:             l.Product.CategoryCode,
+		Operator:             l.Product.OperatorName,
+		Direction:            l.Direction,
+		From:                 transformTrainLegStop(l.Origin),
+		To:                   transformTrainLegStop(l.Destination),
+		Stops:                len(l.Stops),
+		Cancelled:            l.Cancelled || l.PartCancelled,
+		CancelledCause:       legNote(l, "CANCELLATION_CAUSE"),
+		Reachable:            l.Reachable == nil || *l.Reachable,
+		AlternativeTransport: l.AlternativeTransport,
+		Messages:             legMessages(l),
+		CrowdForecast:        l.CrowdForecast,
 	}
+}
+
+// legNote returns the value of the first note with the given key.
+func legNote(l rawNSLeg, key string) string {
+	for _, n := range l.Notes {
+		if n.Key == key {
+			return n.Value
+		}
+	}
+	return ""
+}
+
+// legMessages flattens the upstream message list to distinct texts.
+func legMessages(l rawNSLeg) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, m := range l.Messages {
+		text := firstNonEmpty(m.Text, m.Head)
+		if text == "" || seen[text] {
+			continue
+		}
+		seen[text] = true
+		out = append(out, text)
+	}
+	return out
 }
 
 func transformTrainLegStop(s rawNSLegStop) TrainLegStop {
 	return TrainLegStop{
 		Code:         s.StationCode,
-		Name:         s.Name,
+		Name:         firstNonEmpty(s.RawLocationName, s.Name),
 		Planned:      normalizeUpstreamTime(s.PlannedDateTime),
 		Actual:       normalizeUpstreamTime(firstNonEmpty(s.ActualDateTime, s.PlannedDateTime)),
 		Track:        firstNonEmpty(s.ActualTrack, s.PlannedTrack),
-		TrackChanged: s.PlannedTrack != "" && s.ActualTrack != "" && s.PlannedTrack != s.ActualTrack,
+		TrackChanged: trackChanged(s.PlannedTrack, s.ActualTrack),
 	}
 }

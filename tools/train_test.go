@@ -28,6 +28,8 @@ func (d *nsRoutingDoer) Do(req *http.Request) (*http.Response, error) {
 		body = loadTestData(d.t, "ns_stations.json")
 	case strings.HasSuffix(req.URL.Path, "/api/v2/departures"):
 		body = loadTestData(d.t, "ns_departures_ut.json")
+	case strings.HasSuffix(req.URL.Path, "/api/v3/trips") && req.URL.Query().Get("fromStation") == "ZP":
+		body = loadTestData(d.t, "ns_trips_zp_hgl.json")
 	case strings.HasSuffix(req.URL.Path, "/api/v3/trips"):
 		body = loadTestData(d.t, "ns_trips_asd_ut.json")
 	case strings.Contains(req.URL.Path, "/api/v3/disruptions"):
@@ -245,6 +247,119 @@ func TestTrainTrips_MissingEndpoints(t *testing.T) {
 	}
 	if text, isErr := callTrainTool(t, tool, handler, map[string]any{"from": "Nowhere Special", "to": "UT"}); !isErr || !strings.Contains(text, "Nowhere Special") {
 		t.Errorf("expected error naming the unknown station, got %q", text)
+	}
+}
+
+func TestTrainTrips_DisruptionsAreSurfaced(t *testing.T) {
+	trains, _ := newTrains(t)
+	tool, handler := TrainTripsTool(trains)
+	text, isErr := callTrainTool(t, tool, handler, map[string]any{"from": "Zutphen", "to": "Hengelo"})
+	if isErr {
+		t.Fatalf("tool error: %s", text)
+	}
+	var out TrainTripsResponse
+	decodeInto(t, text, &out)
+	if len(out.Trips) != 3 {
+		t.Fatalf("expected 3 trips, got %d", len(out.Trips))
+	}
+	viaDeventer, cancelled, disrupted := out.Trips[0], out.Trips[1], out.Trips[2]
+
+	// A trip NS reports as NORMAL carries no disruption block.
+	if viaDeventer.Status != "NORMAL" || viaDeventer.Disruption != nil {
+		t.Errorf("normal trip = %+v", viaDeventer)
+	}
+	if !viaDeventer.Legs[1].Reachable || viaDeventer.Legs[1].TransferMinutes != 14 {
+		t.Errorf("transfer leg = %+v", viaDeventer.Legs[1])
+	}
+
+	// The cancelled direct explains itself with the upstream primary message.
+	if cancelled.Status != "CANCELLED" || cancelled.Disruption == nil {
+		t.Fatalf("cancelled trip = %+v", cancelled)
+	}
+	if d := cancelled.Disruption; d.ID != "6067828" || d.Kind != "TRIP_CANCELLED" || d.Title != "Dit reisadvies vervalt" ||
+		!strings.Contains(d.Message, "object op het spoor") {
+		t.Errorf("cancelled.disruption = %+v", d)
+	}
+	if leg := cancelled.Legs[0]; !leg.Cancelled || leg.Reachable || leg.CancelledCause != "door een object op het spoor" ||
+		len(leg.Messages) != 1 || !strings.Contains(leg.Messages[0], "geen treinen") {
+		t.Errorf("cancelled leg = %+v", leg)
+	}
+
+	// A trip through a disrupted section keeps its DISRUPTION status, carries
+	// the disruption id and text, and is never presented as optimal.
+	if disrupted.Status != "DISRUPTION" || disrupted.Disruption == nil {
+		t.Fatalf("disrupted trip = %+v", disrupted)
+	}
+	if d := disrupted.Disruption; d.ID != "6067828" || d.Kind != "DISRUPTION" || d.Title != "Storing" {
+		t.Errorf("disrupted.disruption = %+v", d)
+	}
+	// NS's recommendation is passed through as is, even on a disrupted trip.
+	if !disrupted.Optimal || viaDeventer.Optimal {
+		t.Errorf("optimal flags should match upstream: disrupted=%v viaDeventer=%v", disrupted.Optimal, viaDeventer.Optimal)
+	}
+	if strings.Contains(text, "primaryMessage") || strings.Contains(text, "nesProperties") {
+		t.Error("lean shape leaked upstream field names")
+	}
+}
+
+// ns_trips_zp_hgl_live.json is the real response recorded during the
+// 2026-09-23 Zutphen - Hengelo disruption: two DISRUPTION trips that still
+// run (one of them NS's optimal), then NORMAL ones.
+func TestTrainTrips_LiveDisruptionRecording(t *testing.T) {
+	var raw rawNSTrips
+	decodeInto(t, loadTestData(t, "ns_trips_zp_hgl_live.json"), &raw)
+	out := transformTrainTrips(nsclient.Station{Code: "ZP", Name: "Zutphen"}, nsclient.Station{Code: "HGL", Name: "Hengelo"}, raw)
+	if len(out.Trips) != 5 {
+		t.Fatalf("expected 5 trips, got %d", len(out.Trips))
+	}
+	for i, tr := range out.Trips[:2] {
+		if tr.Status != "DISRUPTION" || tr.Disruption == nil {
+			t.Fatalf("trip %d = %+v", i, tr)
+		}
+		d := tr.Disruption
+		if d.ID != "6067828" || d.Kind != "DISRUPTION" || d.Title != "Storing" || !strings.Contains(d.Message, "object op het spoor") || d.Phase != "PHASE_1B" {
+			t.Errorf("trip %d disruption = %+v", i, d)
+		}
+		if len(tr.Legs) != 1 || tr.Legs[0].Cancelled || !tr.Legs[0].Reachable || len(tr.Legs[0].Messages) != 1 {
+			t.Errorf("trip %d leg = %+v", i, tr.Legs[0])
+		}
+	}
+	if !out.Trips[1].Optimal {
+		t.Error("NS marked the second (disrupted) trip optimal; the flag must survive")
+	}
+	for i, tr := range out.Trips[2:] {
+		if tr.Status != "NORMAL" || tr.Disruption != nil {
+			t.Errorf("trip %d should be NORMAL without a disruption block, got %+v", i+2, tr)
+		}
+	}
+}
+
+// A cancelled trip's primary message can arrive without the message body
+// (seen live on Venlo - Düsseldorf): kind and title only, no empty strings.
+func TestTransformTripDisruption_TitleOnly(t *testing.T) {
+	d := transformTripDisruption(&rawNSPrimaryMessage{Title: "Dit reisadvies vervalt", Type: "TRIP_CANCELLED"})
+	if d == nil || d.Kind != "TRIP_CANCELLED" || d.Title != "Dit reisadvies vervalt" || d.ID != "" || d.Message != "" {
+		t.Fatalf("got %+v", d)
+	}
+	b, _ := json.Marshal(d)
+	if strings.Contains(string(b), `"message"`) || strings.Contains(string(b), `"id"`) {
+		t.Errorf("empty fields should be omitted, got %s", b)
+	}
+	if transformTripDisruption(nil) != nil {
+		t.Error("nil in, nil out")
+	}
+}
+
+func TestTransformTrainLegStop_PrefersRawLocationName(t *testing.T) {
+	stop := transformTrainLegStop(rawNSLegStop{
+		Name: "Schiphol Airport \u2708", RawLocationName: "Schiphol Airport", StationCode: "SHL",
+		PlannedDateTime: "2026-09-23T10:05:00+0200", PlannedTrack: "1-2", ActualTrack: "2",
+	})
+	if stop.Name != "Schiphol Airport" {
+		t.Errorf("name = %q, want the plain rawLocationName", stop.Name)
+	}
+	if stop.TrackChanged {
+		t.Errorf("track 2 is within planned 1-2; track_changed should be false: %+v", stop)
 	}
 }
 

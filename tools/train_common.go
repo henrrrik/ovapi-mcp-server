@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"strconv"
+	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
 
@@ -98,4 +100,27 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+// trackChanged reports whether the actual track is outside what was planned.
+// NS plans some departures on a range ("1-2") and then settles on one side
+// ("1"); that is not a change a traveller needs to know about.
+func trackChanged(planned, actual string) bool {
+	if planned == "" || actual == "" || planned == actual {
+		return false
+	}
+	lo, hi, ok := strings.Cut(planned, "-")
+	if !ok {
+		return true
+	}
+	if actual == lo || actual == hi {
+		return false
+	}
+	l, errL := strconv.Atoi(lo)
+	h, errH := strconv.Atoi(hi)
+	a, errA := strconv.Atoi(actual)
+	if errL != nil || errH != nil || errA != nil {
+		return true
+	}
+	return a < l || a > h
 }
