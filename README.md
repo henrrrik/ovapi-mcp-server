@@ -1,4 +1,4 @@
-# OVapi MCP Server
+# OVapi/NS MCP Server
 
 An MCP (Model Context Protocol) server for Dutch public transport: it proxies the [OVapi](https://www.ovapi.nl/) feed (bus, tram, metro, ferry) with fuzzy stop search powered by Postgres, and the [NS](https://apiportal.ns.nl/) Reisinformatie API for trains.
 
