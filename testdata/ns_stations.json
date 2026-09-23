@@ -1,0 +1,1260 @@
+{
+ "payload": [
+  {
+   "EVACode": "8000085",
+   "UICCode": "8008094",
+   "UICCdCode": "108008094",
+   "code": "DUSSEL",
+   "ingangsDatum": "2017-06-07",
+   "heeftFaciliteiten": true,
+   "heeftReisassistentie": false,
+   "heeftVertrektijden": true,
+   "land": "D",
+   "lat": 51.220146,
+   "lng": 6.793137,
+   "radius": 0,
+   "naderenRadius": 0,
+   "namen": {
+    "lang": "Düsseldorf Hbf",
+    "middel": "Düsseldorf Hbf",
+    "kort": "Düsseldrf"
+   },
+   "synoniemen": [
+    "Dusseldorf",
+    "Dusseldorf Hbf"
+   ],
+   "nearbyMeLocationId": {
+    "value": "DUSSEL",
+    "type": "stationV2"
+   },
+   "sporen": [],
+   "stationType": "MEGA_STATION"
+  },
+  {
+   "EVACode": "8003368",
+   "UICCode": "8015032",
+   "UICCdCode": "108015032",
+   "code": "KKD",
+   "ingangsDatum": "2025-10-02",
+   "heeftFaciliteiten": true,
+   "heeftReisassistentie": false,
+   "heeftVertrektijden": true,
+   "land": "D",
+   "lat": 50.940874,
+   "lng": 6.975001,
+   "radius": 0,
+   "naderenRadius": 0,
+   "namen": {
+    "lang": "Köln Messe/Deutz",
+    "middel": "Köln Messe/Deutz",
+    "kort": "Köln Messe"
+   },
+   "synoniemen": [
+    "Koln Deutz"
+   ],
+   "nearbyMeLocationId": {
+    "value": "KKD",
+    "type": "stationV2"
+   },
+   "sporen": [],
+   "stationType": "MEGA_STATION"
+  },
+  {
+   "EVACode": "8400055",
+   "UICCode": "8400055",
+   "UICCdCode": "118400055",
+   "cdCode": 55,
+   "code": "AMF",
+   "ingangsDatum": "2022-01-06",
+   "heeftFaciliteiten": true,
+   "heeftReisassistentie": true,
+   "heeftVertrektijden": true,
+   "land": "NL",
+   "lat": 52.1538887023926,
+   "lng": 5.37055540084839,
+   "radius": 525,
+   "naderenRadius": 1200,
+   "namen": {
+    "lang": "Amersfoort Centraal",
+    "middel": "Amersfoort C.",
+    "kort": "Amersfrt C"
+   },
+   "synoniemen": [
+    "Amersfoort CS",
+    "Amersfoort"
+   ],
+   "nearbyMeLocationId": {
+    "value": "AMF",
+    "type": "stationV2"
+   },
+   "sporen": [
+    {
+     "spoorNummer": "1"
+    },
+    {
+     "spoorNummer": "2"
+    },
+    {
+     "spoorNummer": "4"
+    },
+    {
+     "spoorNummer": "4a"
+    },
+    {
+     "spoorNummer": "4b"
+    },
+    {
+     "spoorNummer": "5"
+    },
+    {
+     "spoorNummer": "5a"
+    },
+    {
+     "spoorNummer": "5b"
+    },
+    {
+     "spoorNummer": "6"
+    },
+    {
+     "spoorNummer": "7"
+    }
+   ],
+   "stationType": "KNOOPPUNT_INTERCITY_STATION"
+  },
+  {
+   "EVACode": "8400057",
+   "UICCode": "8400057",
+   "UICCdCode": "118400057",
+   "cdCode": 57,
+   "code": "ASA",
+   "ingangsDatum": "2024-12-15",
+   "heeftFaciliteiten": true,
+   "heeftReisassistentie": true,
+   "heeftVertrektijden": true,
+   "land": "NL",
+   "lat": 52.3466682434082,
+   "lng": 4.91777801513672,
+   "radius": 260,
+   "naderenRadius": 1200,
+   "namen": {
+    "lang": "Amsterdam Amstel",
+    "middel": "Amstel",
+    "kort": "Amstel"
+   },
+   "synoniemen": [],
+   "nearbyMeLocationId": {
+    "value": "ASA",
+    "type": "stationV2"
+   },
+   "sporen": [
+    {
+     "spoorNummer": "1"
+    },
+    {
+     "spoorNummer": "4"
+    }
+   ],
+   "stationType": "INTERCITY_STATION"
+  },
+  {
+   "EVACode": "8400058",
+   "UICCode": "8400058",
+   "UICCdCode": "118400058",
+   "cdCode": 58,
+   "code": "ASD",
+   "ingangsDatum": "2025-06-03",
+   "heeftFaciliteiten": true,
+   "heeftReisassistentie": true,
+   "heeftVertrektijden": true,
+   "land": "NL",
+   "lat": 52.3788871765137,
+   "lng": 4.90027761459351,
+   "radius": 525,
+   "naderenRadius": 1200,
+   "namen": {
+    "lang": "Amsterdam Centraal",
+    "middel": "Amsterdam C.",
+    "kort": "Amsterdm C"
+   },
+   "synoniemen": [
+    "Amsterdam CS",
+    "Amsterdam"
+   ],
+   "nearbyMeLocationId": {
+    "value": "ASD",
+    "type": "stationV2"
+   },
+   "sporen": [
+    {
+     "spoorNummer": "1"
+    },
+    {
+     "spoorNummer": "2"
+    },
+    {
+     "spoorNummer": "2a"
+    },
+    {
+     "spoorNummer": "2b"
+    },
+    {
+     "spoorNummer": "4"
+    },
+    {
+     "spoorNummer": "4a"
+    },
+    {
+     "spoorNummer": "4b"
+    },
+    {
+     "spoorNummer": "5"
+    },
+    {
+     "spoorNummer": "5a"
+    },
+    {
+     "spoorNummer": "5b"
+    },
+    {
+     "spoorNummer": "7"
+    },
+    {
+     "spoorNummer": "7a"
+    },
+    {
+     "spoorNummer": "7b"
+    },
+    {
+     "spoorNummer": "8"
+    },
+    {
+     "spoorNummer": "8a"
+    },
+    {
+     "spoorNummer": "8b"
+    },
+    {
+     "spoorNummer": "10"
+    },
+    {
+     "spoorNummer": "10a"
+    },
+    {
+     "spoorNummer": "10b"
+    },
+    {
+     "spoorNummer": "11"
+    },
+    {
+     "spoorNummer": "11a"
+    },
+    {
+     "spoorNummer": "11b"
+    },
+    {
+     "spoorNummer": "13"
+    },
+    {
+     "spoorNummer": "13a"
+    },
+    {
+     "spoorNummer": "13b"
+    },
+    {
+     "spoorNummer": "14"
+    },
+    {
+     "spoorNummer": "14a"
+    },
+    {
+     "spoorNummer": "14b"
+    },
+    {
+     "spoorNummer": "15"
+    },
+    {
+     "spoorNummer": "15a"
+    },
+    {
+     "spoorNummer": "15b"
+    }
+   ],
+   "stationType": "MEGA_STATION"
+  },
+  {
+   "EVACode": "8400059",
+   "UICCode": "8400059",
+   "UICCdCode": "118400059",
+   "cdCode": 59,
+   "code": "ASS",
+   "ingangsDatum": "2015-03-18",
+   "heeftFaciliteiten": true,
+   "heeftReisassistentie": true,
+   "heeftVertrektijden": true,
+   "land": "NL",
+   "lat": 52.3888893127441,
+   "lng": 4.83777761459351,
+   "radius": 525,
+   "naderenRadius": 1200,
+   "namen": {
+    "lang": "Amsterdam Sloterdijk",
+    "middel": "Sloterdijk",
+    "kort": "Sloterdijk"
+   },
+   "synoniemen": [],
+   "nearbyMeLocationId": {
+    "value": "ASS",
+    "type": "stationV2"
+   },
+   "sporen": [
+    {
+     "spoorNummer": "3"
+    },
+    {
+     "spoorNummer": "4"
+    },
+    {
+     "spoorNummer": "5"
+    },
+    {
+     "spoorNummer": "6"
+    },
+    {
+     "spoorNummer": "7"
+    },
+    {
+     "spoorNummer": "8"
+    },
+    {
+     "spoorNummer": "9"
+    },
+    {
+     "spoorNummer": "10"
+    },
+    {
+     "spoorNummer": "11"
+    },
+    {
+     "spoorNummer": "12"
+    }
+   ],
+   "stationType": "KNOOPPUNT_INTERCITY_STATION"
+  },
+  {
+   "EVACode": "8400061",
+   "UICCode": "8400061",
+   "UICCdCode": "118400061",
+   "cdCode": 61,
+   "code": "ASDZ",
+   "ingangsDatum": "2024-12-15",
+   "heeftFaciliteiten": true,
+   "heeftReisassistentie": true,
+   "heeftVertrektijden": true,
+   "land": "NL",
+   "lat": 52.338889,
+   "lng": 4.872356,
+   "radius": 260,
+   "naderenRadius": 1200,
+   "namen": {
+    "lang": "Amsterdam Zuid",
+    "middel": "Amsterdam Zuid",
+    "kort": "Amsterdm Z"
+   },
+   "synoniemen": [],
+   "nearbyMeLocationId": {
+    "value": "ASDZ",
+    "type": "stationV2"
+   },
+   "sporen": [
+    {
+     "spoorNummer": "1"
+    },
+    {
+     "spoorNummer": "2"
+    },
+    {
+     "spoorNummer": "3"
+    },
+    {
+     "spoorNummer": "4"
+    }
+   ],
+   "stationType": "INTERCITY_STATION"
+  },
+  {
+   "EVACode": "8400074",
+   "UICCode": "8400074",
+   "UICCdCode": "118400074",
+   "cdCode": 74,
+   "code": "ASB",
+   "ingangsDatum": "2025-06-03",
+   "heeftFaciliteiten": true,
+   "heeftReisassistentie": true,
+   "heeftVertrektijden": true,
+   "land": "NL",
+   "lat": 52.3122215270996,
+   "lng": 4.94694423675537,
+   "radius": 260,
+   "naderenRadius": 1200,
+   "namen": {
+    "lang": "Amsterdam Bijlmer ArenA",
+    "middel": "Bijlmer ArenA",
+    "kort": "Bijlmer A"
+   },
+   "synoniemen": [],
+   "nearbyMeLocationId": {
+    "value": "ASB",
+    "type": "stationV2"
+   },
+   "sporen": [
+    {
+     "spoorNummer": "1"
+    },
+    {
+     "spoorNummer": "2"
+    },
+    {
+     "spoorNummer": "3"
+    },
+    {
+     "spoorNummer": "6"
+    },
+    {
+     "spoorNummer": "7"
+    },
+    {
+     "spoorNummer": "8"
+    }
+   ],
+   "stationType": "KNOOPPUNT_STOPTREIN_STATION"
+  },
+  {
+   "EVACode": "8400206",
+   "UICCode": "8400206",
+   "UICCdCode": "118400206",
+   "cdCode": 206,
+   "code": "EHV",
+   "ingangsDatum": "2025-06-03",
+   "heeftFaciliteiten": true,
+   "heeftReisassistentie": true,
+   "heeftVertrektijden": true,
+   "land": "NL",
+   "lat": 51.4433326721191,
+   "lng": 5.48138904571533,
+   "radius": 525,
+   "naderenRadius": 1200,
+   "namen": {
+    "lang": "Eindhoven Centraal",
+    "middel": "Eindhoven C.",
+    "kort": "Eindhovn C"
+   },
+   "synoniemen": [
+    "Eindhoven",
+    "Eindhoven CS"
+   ],
+   "nearbyMeLocationId": {
+    "value": "EHV",
+    "type": "stationV2"
+   },
+   "sporen": [
+    {
+     "spoorNummer": "1"
+    },
+    {
+     "spoorNummer": "2"
+    },
+    {
+     "spoorNummer": "3"
+    },
+    {
+     "spoorNummer": "4"
+    },
+    {
+     "spoorNummer": "5"
+    },
+    {
+     "spoorNummer": "6"
+    }
+   ],
+   "stationType": "MEGA_STATION"
+  },
+  {
+   "EVACode": "8400263",
+   "UICCode": "8400263",
+   "UICCdCode": "118400263",
+   "cdCode": 263,
+   "code": "GN",
+   "ingangsDatum": "2025-06-03",
+   "heeftFaciliteiten": true,
+   "heeftReisassistentie": true,
+   "heeftVertrektijden": true,
+   "land": "NL",
+   "lat": 53.2105560302734,
+   "lng": 6.56472206115723,
+   "radius": 525,
+   "naderenRadius": 1200,
+   "namen": {
+    "lang": "Groningen",
+    "middel": "Groningen",
+    "kort": "Groningen"
+   },
+   "synoniemen": [],
+   "nearbyMeLocationId": {
+    "value": "GN",
+    "type": "stationV2"
+   },
+   "sporen": [
+    {
+     "spoorNummer": "1"
+    },
+    {
+     "spoorNummer": "2"
+    },
+    {
+     "spoorNummer": "3"
+    },
+    {
+     "spoorNummer": "4"
+    },
+    {
+     "spoorNummer": "5"
+    },
+    {
+     "spoorNummer": "6"
+    },
+    {
+     "spoorNummer": "7"
+    }
+   ],
+   "stationType": "KNOOPPUNT_INTERCITY_STATION"
+  },
+  {
+   "EVACode": "8400282",
+   "UICCode": "8400282",
+   "UICCdCode": "118400282",
+   "cdCode": 282,
+   "code": "GVC",
+   "ingangsDatum": "2024-12-15",
+   "heeftFaciliteiten": true,
+   "heeftReisassistentie": true,
+   "heeftVertrektijden": true,
+   "land": "NL",
+   "lat": 52.0802764892578,
+   "lng": 4.32499980926514,
+   "radius": 525,
+   "naderenRadius": 1600,
+   "namen": {
+    "lang": "Den Haag Centraal",
+    "middel": "Den Haag C.",
+    "kort": "Den Haag C"
+   },
+   "synoniemen": [
+    "Den Haag CS",
+    "Den Haag",
+    "'s-Gravenhage"
+   ],
+   "nearbyMeLocationId": {
+    "value": "GVC",
+    "type": "stationV2"
+   },
+   "sporen": [
+    {
+     "spoorNummer": "1"
+    },
+    {
+     "spoorNummer": "2"
+    },
+    {
+     "spoorNummer": "3"
+    },
+    {
+     "spoorNummer": "4"
+    },
+    {
+     "spoorNummer": "5"
+    },
+    {
+     "spoorNummer": "6"
+    },
+    {
+     "spoorNummer": "7"
+    },
+    {
+     "spoorNummer": "8"
+    },
+    {
+     "spoorNummer": "9"
+    },
+    {
+     "spoorNummer": "10"
+    },
+    {
+     "spoorNummer": "11"
+    },
+    {
+     "spoorNummer": "12"
+    }
+   ],
+   "stationType": "MEGA_STATION"
+  },
+  {
+   "EVACode": "8400319",
+   "UICCode": "8400319",
+   "UICCdCode": "118400319",
+   "cdCode": 319,
+   "code": "HT",
+   "ingangsDatum": "2025-06-03",
+   "heeftFaciliteiten": true,
+   "heeftReisassistentie": true,
+   "heeftVertrektijden": true,
+   "land": "NL",
+   "lat": 51.69048,
+   "lng": 5.29362,
+   "radius": 525,
+   "naderenRadius": 1200,
+   "namen": {
+    "lang": "'s-Hertogenbosch",
+    "middel": "'s-Hertogenbosch",
+    "kort": "Den Bosch"
+   },
+   "synoniemen": [
+    "Den Bosch",
+    "Hertogenbosch ('s)"
+   ],
+   "nearbyMeLocationId": {
+    "value": "HT",
+    "type": "stationV2"
+   },
+   "sporen": [
+    {
+     "spoorNummer": "1"
+    },
+    {
+     "spoorNummer": "3"
+    },
+    {
+     "spoorNummer": "3a"
+    },
+    {
+     "spoorNummer": "3b"
+    },
+    {
+     "spoorNummer": "4"
+    },
+    {
+     "spoorNummer": "4a"
+    },
+    {
+     "spoorNummer": "4b"
+    },
+    {
+     "spoorNummer": "6"
+    },
+    {
+     "spoorNummer": "6a"
+    },
+    {
+     "spoorNummer": "6b"
+    },
+    {
+     "spoorNummer": "7"
+    },
+    {
+     "spoorNummer": "7a"
+    },
+    {
+     "spoorNummer": "7b"
+    }
+   ],
+   "stationType": "KNOOPPUNT_INTERCITY_STATION"
+  },
+  {
+   "EVACode": "8400390",
+   "UICCode": "8400390",
+   "UICCdCode": "118400390",
+   "cdCode": 390,
+   "code": "LEDN",
+   "ingangsDatum": "2024-12-15",
+   "heeftFaciliteiten": true,
+   "heeftReisassistentie": true,
+   "heeftVertrektijden": true,
+   "land": "NL",
+   "lat": 52.1661109924316,
+   "lng": 4.48166656494141,
+   "radius": 525,
+   "naderenRadius": 1600,
+   "namen": {
+    "lang": "Leiden Centraal",
+    "middel": "Leiden C.",
+    "kort": "Leiden C"
+   },
+   "synoniemen": [
+    "Leiden CS",
+    "Leiden"
+   ],
+   "nearbyMeLocationId": {
+    "value": "LEDN",
+    "type": "stationV2"
+   },
+   "sporen": [
+    {
+     "spoorNummer": "1"
+    },
+    {
+     "spoorNummer": "2"
+    },
+    {
+     "spoorNummer": "4"
+    },
+    {
+     "spoorNummer": "4a"
+    },
+    {
+     "spoorNummer": "4b"
+    },
+    {
+     "spoorNummer": "5"
+    },
+    {
+     "spoorNummer": "5a"
+    },
+    {
+     "spoorNummer": "5b"
+    },
+    {
+     "spoorNummer": "8"
+    },
+    {
+     "spoorNummer": "8a"
+    },
+    {
+     "spoorNummer": "8b"
+    },
+    {
+     "spoorNummer": "9"
+    },
+    {
+     "spoorNummer": "9a"
+    },
+    {
+     "spoorNummer": "9b"
+    }
+   ],
+   "stationType": "KNOOPPUNT_INTERCITY_STATION"
+  },
+  {
+   "EVACode": "8400424",
+   "UICCode": "8400424",
+   "UICCdCode": "118400424",
+   "cdCode": 424,
+   "code": "MT",
+   "ingangsDatum": "2025-06-03",
+   "heeftFaciliteiten": true,
+   "heeftReisassistentie": true,
+   "heeftVertrektijden": true,
+   "land": "NL",
+   "lat": 50.8502769470215,
+   "lng": 5.70555543899536,
+   "radius": 525,
+   "naderenRadius": 1200,
+   "namen": {
+    "lang": "Maastricht",
+    "middel": "Maastricht",
+    "kort": "Maastricht"
+   },
+   "synoniemen": [],
+   "nearbyMeLocationId": {
+    "value": "MT",
+    "type": "stationV2"
+   },
+   "sporen": [
+    {
+     "spoorNummer": "1"
+    },
+    {
+     "spoorNummer": "2"
+    },
+    {
+     "spoorNummer": "3"
+    },
+    {
+     "spoorNummer": "4a"
+    },
+    {
+     "spoorNummer": "4b"
+    },
+    {
+     "spoorNummer": "5a"
+    },
+    {
+     "spoorNummer": "5b"
+    },
+    {
+     "spoorNummer": "6"
+    }
+   ],
+   "stationType": "KNOOPPUNT_INTERCITY_STATION"
+  },
+  {
+   "EVACode": "8400530",
+   "UICCode": "8400530",
+   "UICCdCode": "118400530",
+   "cdCode": 530,
+   "code": "RTD",
+   "ingangsDatum": "2017-02-01",
+   "heeftFaciliteiten": true,
+   "heeftReisassistentie": true,
+   "heeftVertrektijden": true,
+   "land": "NL",
+   "lat": 51.9249992370605,
+   "lng": 4.46888875961304,
+   "radius": 525,
+   "naderenRadius": 1000,
+   "namen": {
+    "lang": "Rotterdam Centraal",
+    "middel": "Rotterdam C.",
+    "kort": "Rotterdm C"
+   },
+   "synoniemen": [
+    "Rotterdam CS",
+    "Rotterdam"
+   ],
+   "nearbyMeLocationId": {
+    "value": "RTD",
+    "type": "stationV2"
+   },
+   "sporen": [
+    {
+     "spoorNummer": "2"
+    },
+    {
+     "spoorNummer": "3"
+    },
+    {
+     "spoorNummer": "4"
+    },
+    {
+     "spoorNummer": "6"
+    },
+    {
+     "spoorNummer": "7"
+    },
+    {
+     "spoorNummer": "8"
+    },
+    {
+     "spoorNummer": "9"
+    },
+    {
+     "spoorNummer": "11"
+    },
+    {
+     "spoorNummer": "12"
+    },
+    {
+     "spoorNummer": "13"
+    },
+    {
+     "spoorNummer": "14"
+    },
+    {
+     "spoorNummer": "15"
+    },
+    {
+     "spoorNummer": "16"
+    }
+   ],
+   "stationType": "MEGA_STATION"
+  },
+  {
+   "EVACode": "8400561",
+   "UICCode": "8400561",
+   "UICCdCode": "118400561",
+   "cdCode": 561,
+   "code": "SHL",
+   "ingangsDatum": "2025-06-03",
+   "heeftFaciliteiten": true,
+   "heeftReisassistentie": true,
+   "heeftVertrektijden": true,
+   "land": "NL",
+   "lat": 52.3094444274902,
+   "lng": 4.76194429397583,
+   "radius": 2800,
+   "naderenRadius": 3200,
+   "namen": {
+    "lang": "Schiphol Airport",
+    "middel": "Schiphol Airport",
+    "kort": "Schiphol",
+    "festive": "Schiphol Airport ✈"
+   },
+   "synoniemen": [
+    "Amsterdam Airport"
+   ],
+   "nearbyMeLocationId": {
+    "value": "SHL",
+    "type": "stationV2"
+   },
+   "sporen": [
+    {
+     "spoorNummer": "1"
+    },
+    {
+     "spoorNummer": "2"
+    },
+    {
+     "spoorNummer": "3"
+    },
+    {
+     "spoorNummer": "4"
+    },
+    {
+     "spoorNummer": "5"
+    },
+    {
+     "spoorNummer": "6"
+    }
+   ],
+   "stationType": "MEGA_STATION"
+  },
+  {
+   "EVACode": "8400606",
+   "UICCode": "8400606",
+   "UICCdCode": "118400606",
+   "cdCode": 606,
+   "code": "UTVR",
+   "ingangsDatum": "2016-08-22",
+   "heeftFaciliteiten": true,
+   "heeftReisassistentie": true,
+   "heeftVertrektijden": true,
+   "land": "NL",
+   "lat": 52.078889,
+   "lng": 5.121667,
+   "radius": 200,
+   "naderenRadius": 1200,
+   "namen": {
+    "lang": "Utrecht Vaartsche Rijn",
+    "middel": "Vaartsche Rijn",
+    "kort": "VaartscheR"
+   },
+   "synoniemen": [],
+   "nearbyMeLocationId": {
+    "value": "UTVR",
+    "type": "stationV2"
+   },
+   "sporen": [
+    {
+     "spoorNummer": "1"
+    },
+    {
+     "spoorNummer": "2"
+    },
+    {
+     "spoorNummer": "3"
+    },
+    {
+     "spoorNummer": "4"
+    }
+   ],
+   "stationType": "KNOOPPUNT_STOPTREIN_STATION"
+  },
+  {
+   "EVACode": "8400607",
+   "UICCode": "8400607",
+   "UICCdCode": "118400607",
+   "cdCode": 607,
+   "code": "UTLR",
+   "ingangsDatum": "2018-05-16",
+   "heeftFaciliteiten": true,
+   "heeftReisassistentie": true,
+   "heeftVertrektijden": true,
+   "land": "NL",
+   "lat": 52.09896,
+   "lng": 5.06523,
+   "radius": 200,
+   "naderenRadius": 1200,
+   "namen": {
+    "lang": "Utrecht Leidsche Rijn",
+    "middel": "Leidsche Rijn",
+    "kort": "LeidscheRn"
+   },
+   "synoniemen": [],
+   "nearbyMeLocationId": {
+    "value": "UTLR",
+    "type": "stationV2"
+   },
+   "sporen": [
+    {
+     "spoorNummer": "1"
+    },
+    {
+     "spoorNummer": "4"
+    }
+   ],
+   "stationType": "STOPTREIN_STATION"
+  },
+  {
+   "EVACode": "8400620",
+   "UICCode": "8400620",
+   "UICCdCode": "118400620",
+   "cdCode": 620,
+   "code": "UTO",
+   "ingangsDatum": "1990-01-01",
+   "heeftFaciliteiten": true,
+   "heeftReisassistentie": true,
+   "heeftVertrektijden": true,
+   "land": "NL",
+   "lat": 52.1100006103516,
+   "lng": 5.12472200393677,
+   "radius": 260,
+   "naderenRadius": 1200,
+   "namen": {
+    "lang": "Utrecht Overvecht",
+    "middel": "Overvecht",
+    "kort": "Overvecht"
+   },
+   "synoniemen": [],
+   "nearbyMeLocationId": {
+    "value": "UTO",
+    "type": "stationV2"
+   },
+   "sporen": [
+    {
+     "spoorNummer": "1"
+    },
+    {
+     "spoorNummer": "2"
+    },
+    {
+     "spoorNummer": "3"
+    }
+   ],
+   "stationType": "KNOOPPUNT_STOPTREIN_STATION"
+  },
+  {
+   "EVACode": "8400621",
+   "UICCode": "8400621",
+   "UICCdCode": "118400621",
+   "cdCode": 621,
+   "code": "UT",
+   "ingangsDatum": "2025-06-03",
+   "heeftFaciliteiten": true,
+   "heeftReisassistentie": true,
+   "heeftVertrektijden": true,
+   "land": "NL",
+   "lat": 52.0888900756836,
+   "lng": 5.11027765274048,
+   "radius": 525,
+   "naderenRadius": 1550,
+   "namen": {
+    "lang": "Utrecht Centraal",
+    "middel": "Utrecht C.",
+    "kort": "Utrecht C"
+   },
+   "synoniemen": [
+    "Utrecht CS",
+    "Utrecht"
+   ],
+   "nearbyMeLocationId": {
+    "value": "UT",
+    "type": "stationV2"
+   },
+   "sporen": [
+    {
+     "spoorNummer": "1"
+    },
+    {
+     "spoorNummer": "2"
+    },
+    {
+     "spoorNummer": "3"
+    },
+    {
+     "spoorNummer": "4"
+    },
+    {
+     "spoorNummer": "5"
+    },
+    {
+     "spoorNummer": "7"
+    },
+    {
+     "spoorNummer": "8"
+    },
+    {
+     "spoorNummer": "9"
+    },
+    {
+     "spoorNummer": "11"
+    },
+    {
+     "spoorNummer": "12"
+    },
+    {
+     "spoorNummer": "14"
+    },
+    {
+     "spoorNummer": "15"
+    },
+    {
+     "spoorNummer": "18"
+    },
+    {
+     "spoorNummer": "19"
+    },
+    {
+     "spoorNummer": "20"
+    },
+    {
+     "spoorNummer": "21"
+    }
+   ],
+   "stationType": "MEGA_STATION"
+  },
+  {
+   "EVACode": "8400623",
+   "UICCode": "8400623",
+   "UICCdCode": "118400623",
+   "cdCode": 623,
+   "code": "UTLN",
+   "ingangsDatum": "2016-06-08",
+   "heeftFaciliteiten": true,
+   "heeftReisassistentie": true,
+   "heeftVertrektijden": true,
+   "land": "NL",
+   "lat": 52.0655555725098,
+   "lng": 5.14416646957397,
+   "radius": 200,
+   "naderenRadius": 1200,
+   "namen": {
+    "lang": "Utrecht Lunetten",
+    "middel": "Lunetten",
+    "kort": "Lunetten"
+   },
+   "synoniemen": [],
+   "nearbyMeLocationId": {
+    "value": "UTLN",
+    "type": "stationV2"
+   },
+   "sporen": [
+    {
+     "spoorNummer": "1"
+    },
+    {
+     "spoorNummer": "2"
+    }
+   ],
+   "stationType": "STOPTREIN_STATION"
+  },
+  {
+   "EVACode": "8400027",
+   "UICCode": "8400624",
+   "UICCdCode": "118400624",
+   "cdCode": 624,
+   "code": "UTM",
+   "ingangsDatum": "2023-10-18",
+   "heeftFaciliteiten": true,
+   "heeftReisassistentie": true,
+   "heeftVertrektijden": false,
+   "land": "NL",
+   "lat": 52.087776184082,
+   "lng": 5.13138866424561,
+   "radius": 200,
+   "naderenRadius": 1200,
+   "namen": {
+    "lang": "Utrecht Maliebaan",
+    "middel": "Maliebaan",
+    "kort": "Maliebaan"
+   },
+   "synoniemen": [
+    "Spoorwegmuseum"
+   ],
+   "nearbyMeLocationId": {
+    "value": "UTM",
+    "type": "stationV2"
+   },
+   "sporen": [
+    {
+     "spoorNummer": "2"
+    }
+   ],
+   "stationType": "STOPTREIN_STATION"
+  },
+  {
+   "EVACode": "8400747",
+   "UICCode": "8400747",
+   "UICCdCode": "118400747",
+   "cdCode": 747,
+   "code": "ZL",
+   "ingangsDatum": "2025-06-03",
+   "heeftFaciliteiten": true,
+   "heeftReisassistentie": true,
+   "heeftVertrektijden": true,
+   "land": "NL",
+   "lat": 52.5047225952148,
+   "lng": 6.09194421768188,
+   "radius": 525,
+   "naderenRadius": 1200,
+   "namen": {
+    "lang": "Zwolle",
+    "middel": "Zwolle",
+    "kort": "Zwolle"
+   },
+   "synoniemen": [],
+   "nearbyMeLocationId": {
+    "value": "ZL",
+    "type": "stationV2"
+   },
+   "sporen": [
+    {
+     "spoorNummer": "1"
+    },
+    {
+     "spoorNummer": "1a"
+    },
+    {
+     "spoorNummer": "1b"
+    },
+    {
+     "spoorNummer": "3"
+    },
+    {
+     "spoorNummer": "4"
+    },
+    {
+     "spoorNummer": "5"
+    },
+    {
+     "spoorNummer": "6"
+    },
+    {
+     "spoorNummer": "7"
+    },
+    {
+     "spoorNummer": "8"
+    },
+    {
+     "spoorNummer": "9"
+    },
+    {
+     "spoorNummer": "10"
+    },
+    {
+     "spoorNummer": "12"
+    },
+    {
+     "spoorNummer": "13"
+    },
+    {
+     "spoorNummer": "14"
+    },
+    {
+     "spoorNummer": "15"
+    },
+    {
+     "spoorNummer": "16"
+    }
+   ],
+   "stationType": "KNOOPPUNT_INTERCITY_STATION"
+  }
+ ]
+}

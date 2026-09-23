@@ -1,2 +1,6 @@
 ovapi-mcp-server
 cmd/scrape/scrape
+
+# local secrets (NS_API_KEY etc.)
+.env
+.env.*
