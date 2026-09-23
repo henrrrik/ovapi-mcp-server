@@ -1255,6 +1255,60 @@
     }
    ],
    "stationType": "KNOOPPUNT_INTERCITY_STATION"
+  },
+  {
+   "EVACode": "8400744",
+   "UICCode": "8400744",
+   "UICCdCode": "118400744",
+   "code": "ZP",
+   "ingangsDatum": "2017-06-07",
+   "heeftFaciliteiten": true,
+   "heeftReisassistentie": true,
+   "heeftVertrektijden": true,
+   "land": "NL",
+   "lat": 52.1452789,
+   "lng": 6.1941667,
+   "radius": 0,
+   "naderenRadius": 0,
+   "namen": {
+    "lang": "Zutphen",
+    "middel": "Zutphen",
+    "kort": "Zutphen"
+   },
+   "synoniemen": [],
+   "nearbyMeLocationId": {
+    "value": "ZP",
+    "type": "stationV2"
+   },
+   "sporen": [],
+   "stationType": "KNOOPPUNT_INTERCITY_STATION"
+  },
+  {
+   "EVACode": "8400316",
+   "UICCode": "8400316",
+   "UICCdCode": "118400316",
+   "code": "HGL",
+   "ingangsDatum": "2017-06-07",
+   "heeftFaciliteiten": true,
+   "heeftReisassistentie": true,
+   "heeftVertrektijden": true,
+   "land": "NL",
+   "lat": 52.2616653,
+   "lng": 6.793889,
+   "radius": 0,
+   "naderenRadius": 0,
+   "namen": {
+    "lang": "Hengelo",
+    "middel": "Hengelo",
+    "kort": "Hengelo"
+   },
+   "synoniemen": [],
+   "nearbyMeLocationId": {
+    "value": "HGL",
+    "type": "stationV2"
+   },
+   "sporen": [],
+   "stationType": "KNOOPPUNT_INTERCITY_STATION"
   }
  ]
 }

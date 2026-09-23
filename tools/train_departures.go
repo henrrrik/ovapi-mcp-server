@@ -159,7 +159,7 @@ func transformTrainDeparture(d rawNSDeparture) TrainDeparture {
 		DelaySeconds: delaySeconds(d.PlannedDateTime, d.ActualDateTime),
 		PlannedTrack: d.PlannedTrack,
 		ActualTrack:  d.ActualTrack,
-		TrackChanged: d.PlannedTrack != "" && d.ActualTrack != "" && d.PlannedTrack != d.ActualTrack,
+		TrackChanged: trackChanged(d.PlannedTrack, d.ActualTrack),
 		Cancelled:    d.Cancelled,
 		Status:       d.DepartureStatus,
 		Route:        route,

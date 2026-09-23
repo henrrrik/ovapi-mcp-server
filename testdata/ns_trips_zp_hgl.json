@@ -1,0 +1,118 @@
+{
+  "source": "HARP",
+  "trips": [
+    {
+      "idx": 0,
+      "plannedDurationInMinutes": 63,
+      "actualDurationInMinutes": 62,
+      "transfers": 1,
+      "status": "NORMAL",
+      "optimal": false,
+      "crowdForecast": "LOW",
+      "productFare": {"priceInCents": 1680, "product": "OVCHIPKAART_ENKELE_REIS", "travelClass": "SECOND_CLASS"},
+      "legs": [
+        {
+          "idx": "0", "name": "IC 3620", "direction": "Zwolle",
+          "partCancelled": false, "cancelled": false, "isOnOrAfterCancelledLeg": false,
+          "reachable": true, "alternativeTransport": false,
+          "origin": {"name": "Zutphen", "rawLocationName": "Zutphen", "stationCode": "ZP",
+            "plannedDateTime": "2026-09-23T10:03:00+0200", "actualDateTime": "2026-09-23T10:04:00+0200",
+            "plannedTrack": "3", "actualTrack": "3"},
+          "destination": {"name": "Deventer", "rawLocationName": "Deventer", "stationCode": "DV",
+            "plannedDateTime": "2026-09-23T10:15:00+0200", "actualDateTime": "2026-09-23T10:15:00+0200",
+            "plannedTrack": "4", "actualTrack": "4"},
+          "product": {"number": "3620", "categoryCode": "IC", "longCategoryName": "Intercity", "operatorCode": "NS", "operatorName": "NS"},
+          "stops": [{"passing": false}, {"passing": false}],
+          "crowdForecast": "LOW"
+        },
+        {
+          "idx": "1", "name": "IC 1731", "direction": "Enschede",
+          "partCancelled": false, "cancelled": false, "isOnOrAfterCancelledLeg": false,
+          "reachable": true, "alternativeTransport": false,
+          "transferMessages": [{"message": "14 min. overstaptijd", "type": "TRANSFER_TIME"}],
+          "origin": {"name": "Deventer", "rawLocationName": "Deventer", "stationCode": "DV",
+            "plannedDateTime": "2026-09-23T10:29:00+0200", "actualDateTime": "2026-09-23T10:29:00+0200",
+            "plannedTrack": "1", "actualTrack": "1"},
+          "destination": {"name": "Hengelo", "rawLocationName": "Hengelo", "stationCode": "HGL",
+            "plannedDateTime": "2026-09-23T11:06:00+0200", "actualDateTime": "2026-09-23T11:06:00+0200",
+            "plannedTrack": "3", "actualTrack": "3"},
+          "product": {"number": "1731", "categoryCode": "IC", "longCategoryName": "Intercity", "operatorCode": "NS", "operatorName": "NS"},
+          "stops": [{"passing": false}, {"passing": false}, {"passing": false}],
+          "crowdForecast": "LOW"
+        }
+      ]
+    },
+    {
+      "idx": 1,
+      "plannedDurationInMinutes": 38,
+      "actualDurationInMinutes": 38,
+      "transfers": 0,
+      "status": "CANCELLED",
+      "optimal": false,
+      "crowdForecast": "UNKNOWN",
+      "primaryMessage": {
+        "title": "Dit reisadvies vervalt",
+        "type": "TRIP_CANCELLED",
+        "message": {"id": "6067828", "externalId": "prio-6067828", "type": "DISRUPTION", "phase": "PHASE_1B",
+          "head": "Door een object op het spoor: tussen Zutphen en Hengelo rijden er geen treinen.",
+          "text": "Door een object op het spoor: tussen Zutphen en Hengelo rijden er geen treinen."}
+      },
+      "productFare": {"priceInCents": 1253, "product": "OVCHIPKAART_ENKELE_REIS", "travelClass": "SECOND_CLASS"},
+      "legs": [
+        {
+          "idx": "0", "name": "ST 31225", "direction": "Oldenzaal",
+          "partCancelled": true, "cancelled": true, "isOnOrAfterCancelledLeg": true,
+          "reachable": false, "alternativeTransport": false,
+          "origin": {"name": "Zutphen", "rawLocationName": "Zutphen", "stationCode": "ZP",
+            "plannedDateTime": "2026-09-23T10:06:00+0200", "plannedTrack": "2b"},
+          "destination": {"name": "Hengelo", "rawLocationName": "Hengelo", "stationCode": "HGL",
+            "plannedDateTime": "2026-09-23T10:44:00+0200", "actualDateTime": "2026-09-23T10:44:00+0200",
+            "plannedTrack": "3b", "actualTrack": "3b"},
+          "product": {"number": "31225", "categoryCode": "ST", "longCategoryName": "Stoptrein", "operatorCode": "Bla", "operatorName": "Blauwnet Arriva"},
+          "notes": [{"value": "door een object op het spoor", "key": "CANCELLATION_CAUSE", "noteType": "UNKNOWN"}],
+          "messages": [{"id": "6067828", "type": "DISRUPTION", "phase": "PHASE_1B",
+            "head": "Door een object op het spoor: tussen Zutphen en Hengelo rijden er geen treinen.",
+            "text": "Door een object op het spoor: tussen Zutphen en Hengelo rijden er geen treinen."}],
+          "stops": [{"passing": false}, {"passing": false}, {"passing": false}, {"passing": false}, {"passing": false}, {"passing": false}],
+          "crowdForecast": "UNKNOWN"
+        }
+      ]
+    },
+    {
+      "idx": 2,
+      "plannedDurationInMinutes": 38,
+      "actualDurationInMinutes": 38,
+      "transfers": 0,
+      "status": "DISRUPTION",
+      "optimal": true,
+      "crowdForecast": "UNKNOWN",
+      "primaryMessage": {
+        "title": "Storing",
+        "type": "DISRUPTION",
+        "message": {"id": "6067828", "externalId": "prio-6067828", "type": "DISRUPTION", "phase": "PHASE_1B",
+          "head": "Door een object op het spoor: tussen Zutphen en Hengelo rijden er geen treinen.",
+          "text": "Door een object op het spoor: tussen Zutphen en Hengelo rijden er geen treinen."}
+      },
+      "productFare": {"priceInCents": 1253, "product": "OVCHIPKAART_ENKELE_REIS", "travelClass": "SECOND_CLASS"},
+      "legs": [
+        {
+          "idx": "0", "name": "ST 31227", "direction": "Oldenzaal",
+          "partCancelled": false, "cancelled": false, "isOnOrAfterCancelledLeg": false,
+          "reachable": true, "alternativeTransport": false,
+          "origin": {"name": "Zutphen", "rawLocationName": "Zutphen", "stationCode": "ZP",
+            "plannedDateTime": "2026-09-23T10:36:00+0200", "actualDateTime": "2026-09-23T10:36:00+0200",
+            "plannedTrack": "2b", "actualTrack": "2b"},
+          "destination": {"name": "Hengelo", "rawLocationName": "Hengelo", "stationCode": "HGL",
+            "plannedDateTime": "2026-09-23T11:14:00+0200", "actualDateTime": "2026-09-23T11:14:00+0200",
+            "plannedTrack": "3b", "actualTrack": "3b"},
+          "product": {"number": "31227", "categoryCode": "ST", "longCategoryName": "Stoptrein", "operatorCode": "Bla", "operatorName": "Blauwnet Arriva"},
+          "messages": [{"id": "6067828", "type": "DISRUPTION", "phase": "PHASE_1B",
+            "head": "Door een object op het spoor: tussen Zutphen en Hengelo rijden er geen treinen.",
+            "text": "Door een object op het spoor: tussen Zutphen en Hengelo rijden er geen treinen."}],
+          "stops": [{"passing": false}, {"passing": false}, {"passing": false}, {"passing": false}, {"passing": false}, {"passing": false}],
+          "crowdForecast": "UNKNOWN"
+        }
+      ]
+    }
+  ]
+}
